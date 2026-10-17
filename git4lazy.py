@@ -8,6 +8,10 @@ Touches :
   r            annuler les modifications (Changes not staged for commit)
   u            retirer de l'index (Changes to be committed)
   c            commit (Changes to be committed)
+  →            liste des commits non poussés (← pour revenir aux fichiers)
+               Espace pour sélectionner, s pour squasher les commits choisis,
+               e pour modifier le message du commit choisi,
+               r pour annuler le dernier commit (git reset HEAD~)
   q            quitter
 
 a, r, u et c n'agissent que sur les fichiers sélectionnés de la section.
@@ -32,7 +36,11 @@ STATUS_LABELS = {
 BACKSPACE = (curses.KEY_BACKSPACE, "\x7f", "\b")
 ENTER = (curses.KEY_ENTER, "\n", "\r")
 ESCAPE, CTRL_V = "\x1b", "\x16"
-HELP = "Espace sélect.  a add  r restore  u unstage  c commit  Tab section  F5 rafraîchir  q quitter"
+FILES, COMMITS = "files", "commits"
+HELP = {
+    FILES: "Espace sélect.  a add  r restore  u unstage  c commit  Tab section  → commits  F5 rafraîchir  q quitter",
+    COMMITS: "Espace sélect.  s squash  e modifier le message  r reset  ← fichiers  F5 rafraîchir  q quitter",
+}
 
 
 # --- Git ---------------------------------------------------------------------
@@ -82,6 +90,74 @@ def read_status():
         if y != " ":
             unstaged.append(Entry(UNSTAGED, y, paths[:1]))
     return staged, unstaged, untracked
+
+
+def read_unpushed():
+    """Renvoie (branche distante comparée, commits locaux absents du distant).
+
+    La comparaison se fait avec l'état du distant connu localement (dernier
+    fetch). Sans branche distante suivie, on exclut les commits présents sur
+    n'importe quelle branche distante.
+    """
+    if not has_head():
+        return None, []
+    upstream = git("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
+    if upstream.returncode == 0:
+        ref, revisions = upstream.stdout.strip(), ["@{upstream}..HEAD"]
+    else:
+        ref, revisions = None, ["HEAD", "--not", "--remotes"]
+    out = git("log", "--format=%H%x1f%h%x1f%ar%x1f%an%x1f%s", *revisions).stdout
+    return ref, [tuple(line.split("\x1f", 4)) for line in out.splitlines()]
+
+
+def message_of(sha):
+    return git("log", "-1", "--format=%B", sha).stdout.strip()
+
+
+def recommit(source, parent, message, author=None):
+    """Crée au-dessus de parent un commit avec l'arbre de source et l'auteur
+    de author (par défaut, celui de source)."""
+    name, email, date = git("log", "-1", "--format=%an%x00%ae%x00%aD",
+                            author or source).stdout.strip().split("\0")
+    env = {**os.environ, "GIT_AUTHOR_NAME": name, "GIT_AUTHOR_EMAIL": email, "GIT_AUTHOR_DATE": date}
+    parents = ["-p", parent] if parent else []
+    return git("commit-tree", source + "^{tree}", *parents, env=env, input=message + "\n")
+
+
+def has_merges(shas):
+    return bool(git("rev-list", "--min-parents=2", "--no-walk", *shas).stdout.strip())
+
+
+def git_rewrite(shas, newest, oldest, message, label):
+    """Remplace shas[newest..oldest] (du plus récent au plus ancien) par un seul
+    commit portant message : un squash, ou un changement de message si
+    newest == oldest.
+
+    Les arbres ne changent pas : le nouveau commit prend l'arbre du plus récent
+    commit remplacé et les commits suivants sont recréés à l'identique par-dessus.
+    Aucun conflit n'est donc possible, et l'index comme la copie de travail
+    restent intacts. L'ancienne version reste accessible par git reflog.
+    """
+    parent = git("rev-parse", "--verify", "--quiet", shas[oldest] + "^").stdout.strip()
+    # Comme git rebase, un squash garde l'auteur du plus ancien commit.
+    result = recommit(shas[newest], parent, message, author=shas[oldest])
+    for sha in reversed(shas[:newest]):
+        if result.returncode:
+            break
+        result = recommit(sha, result.stdout.strip(), message_of(sha))
+    if result.returncode:
+        return result
+    return git("update-ref", "-m", f"git4lazy: {label}", "HEAD", result.stdout.strip(), shas[0])
+
+
+def git_undo_last_commit():
+    # Équivaut à git reset HEAD~ : le commit disparaît et ses modifications
+    # reviennent dans la copie de travail, non indexées.
+    if git("rev-parse", "--verify", "--quiet", "HEAD^").returncode == 0:
+        return git("reset", "--quiet", "HEAD~")
+    # Premier commit du dépôt : pas de parent, la branche redevient vide.
+    result = git("update-ref", "-d", "HEAD")
+    return result if result.returncode else git("rm", "-r", "--cached", "--quiet", ".")
 
 
 def paths_of(entries):
@@ -159,6 +235,10 @@ class TextField:
         self.multiline = multiline
         self.lines, self.row, self.col, self.top = [""], 0, 0, 0
 
+    def set(self, text):
+        self.lines = text.split("\n")
+        self.row, self.col = len(self.lines) - 1, len(self.lines[-1])
+
     @property
     def text(self):
         return "\n".join(self.lines).strip()
@@ -224,10 +304,13 @@ class TextField:
 class CommitDialog:
     """Fenêtre de saisie du titre et du message de commit."""
 
-    def __init__(self, scr, draw_background):
+    def __init__(self, scr, draw_background, heading="Commit", title="", body=""):
         self.scr = scr
         self.draw_background = draw_background
+        self.heading = heading
         self.fields = [TextField(multiline=False), TextField(multiline=True)]
+        self.fields[0].set(title)
+        self.fields[1].set(body)
         self.active = 0
         self.error = ""
 
@@ -259,7 +342,7 @@ class CommitDialog:
         win = curses.newwin(height, width, max((h - height) // 2, 0), max((w - width) // 2, 0))
         win.keypad(True)
         win.box()
-        put(win, 0, 2, " Commit ", curses.A_BOLD)
+        put(win, 0, 2, f" {self.heading} ", curses.A_BOLD)
         inner = width - 4
         labels = ("Titre :", "Message :")
         tops = (2, 5)
@@ -286,13 +369,17 @@ class App:
     def __init__(self, scr):
         self.scr = scr
         self.selected = set()
-        self.cursor = self.top = 0
+        self.selected_commits = set()
+        self.view = FILES
+        self.cursor = self.commit_cursor = 0
+        self.top = {FILES: 0, COMMITS: 0}
         self.message, self.message_is_error = "", False
         set_cursor_visible(0)
         if curses.has_colors():
             curses.use_default_colors()
             curses.init_pair(1, curses.COLOR_GREEN, -1)
             curses.init_pair(2, curses.COLOR_RED, -1)
+            curses.init_pair(3, curses.COLOR_YELLOW, -1)
         self.colors = {STAGED: curses.color_pair(1), UNSTAGED: curses.color_pair(2),
                        UNTRACKED: curses.color_pair(2)}
         self.refresh()
@@ -304,6 +391,9 @@ class App:
         self.selected &= set(self.items)
         self.cursor = min(self.cursor, max(len(self.items) - 1, 0))
         self.branch = git("branch", "--show-current").stdout.strip() or "(HEAD détachée)"
+        self.upstream, self.commits = read_unpushed()
+        self.selected_commits &= {c[0] for c in self.commits}
+        self.commit_cursor = min(self.commit_cursor, max(len(self.commits) - 1, 0))
 
     @property
     def current(self):
@@ -367,6 +457,63 @@ class App:
         self.refresh()
         self.report(result, result.stdout.splitlines()[0] if result.stdout else "Commit effectué.")
 
+    def squash(self):
+        shas = [c[0] for c in self.commits]
+        chosen = [i for i, sha in enumerate(shas) if sha in self.selected_commits]
+        if len(chosen) < 2:
+            self.notify("Sélectionnez au moins deux commits avec Espace.", error=True)
+            return
+        newest, oldest = chosen[0], chosen[-1]
+        if oldest - newest + 1 != len(chosen):
+            self.notify("Les commits sélectionnés doivent se suivre.", error=True)
+            return
+        # Comme git rebase : titre du plus ancien, puis le reste des messages dans l'ordre.
+        messages = [message_of(sha) for sha in reversed(shas[newest:oldest + 1])]
+        title, _, first_body = messages[0].partition("\n")
+        body = "\n\n".join(m for m in [first_body.strip(), *messages[1:]] if m)
+        self.rewrite(shas, newest, oldest, "squash", "Squash", title, body,
+                     f"{len(chosen)} commits fusionnés en un seul.")
+
+    def reword(self):
+        shas = [c[0] for c in self.commits]
+        chosen = [i for i, sha in enumerate(shas) if sha in self.selected_commits]
+        if len(chosen) != 1:
+            self.notify("Sélectionnez un seul commit avec Espace pour modifier son message.", error=True)
+            return
+        title, _, body = message_of(shas[chosen[0]]).partition("\n")
+        self.rewrite(shas, chosen[0], chosen[0], "reword", "Modifier le commit", title,
+                     body.strip(), "Message du commit modifié.")
+
+    def undo_last_commit(self):
+        chosen = [i for i, c in enumerate(self.commits) if c[0] in self.selected_commits]
+        if chosen != [0]:
+            self.notify("Sélectionnez uniquement le dernier commit (en haut de la liste) avec Espace.",
+                        error=True)
+            return
+        if not self.confirm("Annuler le dernier commit ? Ses modifications resteront dans les fichiers."):
+            self.notify("Annulé.")
+            return
+        result = git_undo_last_commit()
+        self.selected_commits.clear()
+        self.refresh()
+        self.report(result, "Dernier commit annulé : ses modifications ne sont plus indexées.")
+
+    def rewrite(self, shas, newest, oldest, label, heading, title, body, done):
+        # Les commits plus récents sont recréés aussi : aucun ne doit être un merge.
+        if has_merges(shas[:oldest + 1]):
+            self.notify("Impossible : l'historique concerné contient un merge.", error=True)
+            return
+        answer = CommitDialog(self.scr, self.draw, heading, title, body).run()
+        if answer is None:
+            self.notify("Annulé.")
+            return
+        message = answer[0] + (f"\n\n{answer[1]}" if answer[1] else "")
+        result = git_rewrite(shas, newest, oldest, message, label)
+        self.selected_commits.clear()
+        self.commit_cursor = newest
+        self.refresh()
+        self.report(result, done)
+
     def jump_to_other_section(self):
         if self.current is None:
             return
@@ -382,10 +529,7 @@ class App:
 
     # Affichage
 
-    def draw(self):
-        scr = self.scr
-        scr.erase()
-        h, w = scr.getmaxyx()
+    def file_rows(self):
         rows = [(f"Sur la branche {self.branch}", curses.A_BOLD, None), ("", 0, None)]
         for section in SECTION_TITLES:
             rows.append((SECTION_TITLES[section] + " :", curses.A_BOLD, None))
@@ -396,21 +540,44 @@ class App:
                 mark = "[x]" if e in self.selected else "[ ]"
                 rows.append((f"  {mark} {e.label}", self.colors[section], i))
             rows.append(("", 0, None))
+        return rows
+
+    def commit_rows(self):
+        target = self.upstream or "aucune branche distante suivie"
+        rows = [(f"Commits non poussés de {self.branch} ({target})", curses.A_BOLD, None),
+                ("", 0, None)]
+        if not self.commits:
+            rows.append(("    (aucun commit à pousser)", curses.A_DIM, None))
+        for i, (sha, short, date, author, subject) in enumerate(self.commits):
+            mark = "[x]" if sha in self.selected_commits else "[ ]"
+            rows.append((f"  {mark} {short}  {subject}  ({author}, {date})", curses.color_pair(3), i))
+        return rows
+
+    def draw(self):
+        scr = self.scr
+        scr.erase()
+        h, w = scr.getmaxyx()
+        if self.view == FILES:
+            rows, cursor = self.file_rows(), self.cursor
+        else:
+            rows, cursor = self.commit_rows(), self.commit_cursor
 
         body_height = max(h - 2, 1)
-        cursor_row = next((n for n, row in enumerate(rows) if row[2] == self.cursor), 0)
-        if cursor_row < self.top:
-            self.top = cursor_row
-        elif cursor_row >= self.top + body_height:
-            self.top = cursor_row - body_height + 1
-        for y, (text, attr, index) in enumerate(rows[self.top:self.top + body_height]):
-            if index is not None and index == self.cursor:
+        top = self.top[self.view]
+        cursor_row = next((n for n, row in enumerate(rows) if row[2] == cursor), 0)
+        if cursor_row < top:
+            top = cursor_row
+        elif cursor_row >= top + body_height:
+            top = cursor_row - body_height + 1
+        self.top[self.view] = top
+        for y, (text, attr, index) in enumerate(rows[top:top + body_height]):
+            if index is not None and index == cursor:
                 attr |= curses.A_REVERSE
             put(scr, y, 0, text, attr)
 
         put(scr, h - 2, 0, self.message,
             curses.color_pair(2) | curses.A_BOLD if self.message_is_error else curses.A_BOLD)
-        put(scr, h - 1, 0, HELP, curses.A_DIM)
+        put(scr, h - 1, 0, HELP[self.view], curses.A_DIM)
         scr.noutrefresh()
 
     def run(self):
@@ -421,25 +588,50 @@ class App:
             self.notify("")
             if key in ("q", "Q"):
                 return
-            elif key in (curses.KEY_UP, "k"):
-                self.cursor = max(self.cursor - 1, 0)
-            elif key in (curses.KEY_DOWN, "j"):
-                self.cursor = max(min(self.cursor + 1, len(self.items) - 1), 0)
-            elif key == "\t":
-                self.jump_to_other_section()
-            elif key == " ":
-                self.toggle()
-            elif key == "a":
-                self.act((UNSTAGED, UNTRACKED), git_add, "ajouté(s) à l'index")
-            elif key == "r":
-                self.act((UNSTAGED,), git_restore, "restauré(s)",
-                         "Annuler les modifications de {n} fichier(s) ? Elles seront perdues.")
-            elif key == "u":
-                self.act((STAGED,), git_unstage, "retiré(s) de l'index")
-            elif key == "c":
-                self.commit()
             elif key == curses.KEY_F5:
                 self.refresh()
+            elif self.view == COMMITS:
+                self.handle_commits_key(key)
+            else:
+                self.handle_files_key(key)
+
+    def handle_commits_key(self, key):
+        if key == curses.KEY_LEFT:
+            self.view = FILES
+        elif key in (curses.KEY_UP, "k"):
+            self.commit_cursor = max(self.commit_cursor - 1, 0)
+        elif key in (curses.KEY_DOWN, "j"):
+            self.commit_cursor = max(min(self.commit_cursor + 1, len(self.commits) - 1), 0)
+        elif key == " " and self.commits:
+            self.selected_commits ^= {self.commits[self.commit_cursor][0]}
+        elif key == "s":
+            self.squash()
+        elif key == "e":
+            self.reword()
+        elif key == "r":
+            self.undo_last_commit()
+
+    def handle_files_key(self, key):
+        if key == curses.KEY_RIGHT:
+            self.refresh()  # prend en compte un push fait depuis un autre terminal
+            self.view = COMMITS
+        elif key in (curses.KEY_UP, "k"):
+            self.cursor = max(self.cursor - 1, 0)
+        elif key in (curses.KEY_DOWN, "j"):
+            self.cursor = max(min(self.cursor + 1, len(self.items) - 1), 0)
+        elif key == "\t":
+            self.jump_to_other_section()
+        elif key == " ":
+            self.toggle()
+        elif key == "a":
+            self.act((UNSTAGED, UNTRACKED), git_add, "ajouté(s) à l'index")
+        elif key == "r":
+            self.act((UNSTAGED,), git_restore, "restauré(s)",
+                     "Annuler les modifications de {n} fichier(s) ? Elles seront perdues.")
+        elif key == "u":
+            self.act((STAGED,), git_unstage, "retiré(s) de l'index")
+        elif key == "c":
+            self.commit()
 
 
 def main():

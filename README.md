@@ -49,6 +49,7 @@ ln -s "$PWD/git4lazy.py" ~/.local/bin/git4lazy
 | r          | Changes not staged for commit                    | Annuler les modifications des fichiers sélectionnés (`git restore`), après confirmation |
 | u          | Changes to be committed                          | Retirer les fichiers sélectionnés de l'index            |
 | c          | Changes to be committed                          | Saisir un titre et un message, puis commiter les fichiers sélectionnés |
+| →          | toutes                                           | Afficher les commits non poussés                        |
 | F5         | toutes                                           | Rafraîchir                                              |
 | q          | toutes                                           | Quitter                                                 |
 
@@ -69,6 +70,47 @@ renvoyée par git, s'affiche en bas de l'écran.
 Le commit ne contient que les fichiers sélectionnés, dans leur version
 indexée. Les autres fichiers indexés restent dans l'index pour un prochain
 commit.
+
+### Commits non poussés
+
+La flèche droite affiche les commits locaux qui ne sont pas encore sur le
+dépôt distant, du plus récent au plus ancien.
+
+| Touche     | Action                                                  |
+|------------|---------------------------------------------------------|
+| ↑/↓ ou k/j | Parcourir la liste                                      |
+| Espace     | Sélectionner ou désélectionner un commit                |
+| s          | Squasher les commits sélectionnés en un seul            |
+| e          | Modifier le titre et le message du commit sélectionné   |
+| r          | Annuler le dernier commit (`git reset HEAD~`)           |
+| ←          | Revenir aux fichiers                                    |
+
+Pour un squash, les commits sélectionnés doivent être au moins deux et se
+suivre. Une fenêtre s'ouvre avec le titre du plus ancien et les messages
+des autres, modifiables ; Ctrl+V valide, Échap annule. Comme avec
+`git rebase -i`, le commit obtenu garde l'auteur et la date du plus ancien,
+et les commits plus récents sont recréés par-dessus. Le contenu des
+fichiers, l'index et la copie de travail ne changent pas. L'historique
+d'avant reste accessible par `git reflog` (entrée « git4lazy: squash »).
+
+Pour modifier un message, sélectionnez un seul commit puis appuyez sur `e` :
+la fenêtre s'ouvre avec son titre et son message actuels. Seul le message
+change ; l'auteur, la date et le contenu sont conservés, et les commits plus
+récents sont recréés par-dessus (entrée « git4lazy: reword » dans le reflog).
+
+Squash et modification sont refusés si l'historique concerné contient un merge.
+
+Pour annuler le dernier commit, sélectionnez-le (le seul accepté est celui
+en haut de la liste) puis appuyez sur `r` et confirmez avec `o`. C'est
+l'équivalent de `git reset HEAD~` : le commit disparaît, ses modifications
+restent dans les fichiers mais ne sont plus indexées. Comme la liste ne
+montre que les commits non poussés, un commit déjà poussé ne peut pas être
+annulé ainsi.
+
+La comparaison se fait avec la branche distante suivie (par exemple
+`origin/main`), telle que connue lors du dernier `git fetch` ou `git push` :
+aucun accès réseau n'est fait. Sans branche distante suivie, la liste montre
+les commits absents de toutes les branches distantes.
 
 ## Bon à savoir
 
