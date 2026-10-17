@@ -10,7 +10,7 @@ Touches :
   c            commit (Changes to be committed)
   q            quitter
 
-Sans sélection, a, r et u agissent sur le fichier sous le curseur.
+a, r, u et c n'agissent que sur les fichiers sélectionnés de la section.
 """
 
 import curses
@@ -37,9 +37,13 @@ HELP = "Espace sélect.  a add  r restore  u unstage  c commit  Tab section  F5 
 
 # --- Git ---------------------------------------------------------------------
 
-def git(*args):
+def git(*args, env=None, input=None):
     return subprocess.run(["git", *args], capture_output=True, text=True,
-                          errors="surrogateescape")
+                          errors="surrogateescape", env=env, input=input)
+
+
+def has_head():
+    return git("rev-parse", "--verify", "--quiet", "HEAD").returncode == 0
 
 
 @dataclass(frozen=True)
@@ -92,7 +96,7 @@ def git_unstage(entries):
     # restore --staged annule l'indexation sans rien supprimer du dépôt. Avant le
     # premier commit il n'y a pas de HEAD : tout fichier indexé est alors nouveau
     # et rm --cached fait exactement la même chose.
-    if git("rev-parse", "--verify", "--quiet", "HEAD").returncode == 0:
+    if has_head():
         return git("restore", "--staged", "--", *paths_of(entries))
     return git("rm", "--cached", "--quiet", "--", *paths_of(entries))
 
@@ -103,11 +107,30 @@ def git_restore(entries):
     return git("restore", "--", *paths_of(entries))
 
 
-def git_commit(title, body):
-    args = ["commit", "-m", title]
-    if body:
-        args += ["-m", body]
-    return git(*args)
+def git_commit(entries, title, body):
+    # Le commit ne doit contenir que les fichiers sélectionnés, dans leur version
+    # indexée. Il est construit dans un index temporaire partant de HEAD, où l'on
+    # recopie leurs entrées ; les autres fichiers restent indexés dans l'index réel.
+    paths = paths_of(entries)
+    index = os.path.abspath(git("rev-parse", "--git-path", "index.git4lazy").stdout.strip())
+    env = {**os.environ, "GIT_INDEX_FILE": index}
+    args = ["commit", "-m", title] + (["-m", body] if body else [])
+    try:
+        if os.path.exists(index):
+            os.remove(index)
+        if has_head():
+            git("read-tree", "HEAD", env=env)
+        staged = git("ls-files", "--stage", "-z", "--", *paths).stdout
+        git("update-index", "-z", "--index-info", env=env, input=staged)
+        # Absent de l'index réel : suppression indexée (ou ancien nom d'un renommage).
+        present = {f.split("\t", 1)[1] for f in staged.split("\0") if f}
+        removed = [p for p in paths if p not in present]
+        if removed:
+            git("update-index", "--force-remove", "--", *removed, env=env)
+        return git(*args, env=env)
+    finally:
+        if os.path.exists(index):
+            os.remove(index)
 
 
 # --- Interface ---------------------------------------------------------------
@@ -310,13 +333,21 @@ class App:
             return False
         return True
 
+    def targets(self, *sections):
+        """Fichiers sélectionnés visés par une action ; liste vide s'il n'y en a pas."""
+        if not self.in_section(*sections):
+            return []
+        targets = [e for e in self.items if e.section in sections and e in self.selected]
+        if not targets:
+            self.notify("Aucun fichier sélectionné : utilisez Espace pour en choisir.", error=True)
+        return targets
+
     # Actions
 
     def act(self, sections, action, done, question=None):
-        if not self.in_section(*sections):
+        targets = self.targets(*sections)
+        if not targets:
             return
-        targets = [e for e in self.items if e.section in sections and e in self.selected]
-        targets = targets or [self.current]
         if question and not self.confirm(question.format(n=len(targets))):
             self.notify("Annulé.")
             return
@@ -325,13 +356,14 @@ class App:
         self.report(result, f"{len(targets)} fichier(s) {done}.")
 
     def commit(self):
-        if not self.in_section(STAGED):
+        targets = self.targets(STAGED)
+        if not targets:
             return
         answer = CommitDialog(self.scr, self.draw).run()
         if answer is None:
             self.notify("Commit annulé.")
             return
-        result = git_commit(*answer)
+        result = git_commit(targets, *answer)
         self.refresh()
         self.report(result, result.stdout.splitlines()[0] if result.stdout else "Commit effectué.")
 
