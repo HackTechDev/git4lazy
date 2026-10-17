@@ -3,18 +3,11 @@
 Pistes relevées en relisant le code (`git4lazy.py`, ~800 lignes) et en
 l'utilisant. Chaque point indique le problème, une piste de solution et
 un effort estimé (S : moins d'une heure, M : une demi-journée, L : plus).
+Les tâches retenues passent dans [TODO.md](TODO.md).
 
 ## 1. Fiabilité
 
 Ce qui peut aujourd'hui donner un résultat faux ou silencieux.
-
-### Erreurs de `git status` ignorées — S
-`read_status()` lit la sortie de `git status` sans regarder son code de
-retour. Si la commande échoue (fichier `index.lock` laissé par un autre
-processus, dépôt corrompu), l'écran affiche trois sections vides comme si
-tout était propre.
-**Piste** : vérifier `returncode` et afficher l'erreur dans la ligne de
-message, comme pour les autres commandes.
 
 ### Conflits de fusion non gérés — M
 Pendant un merge ou un rebase, les fichiers en conflit (`UU`, `AA`…)
@@ -150,6 +143,5 @@ code. Ajouter un fichier `LICENSE` (MIT, GPL…) selon vos intentions.
 
 Pour un maximum d'effet avec peu d'effort :
 
-1. Erreurs de `git status` ignorées (fiabilité, S)
-2. Tests de la couche git (M) : ils sécurisent tout le reste
-3. Licence (S)
+1. Tests de la couche git (M) : ils sécurisent tout le reste
+2. Licence (S)

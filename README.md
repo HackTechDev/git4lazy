@@ -21,7 +21,8 @@ Untracked files :
 ```
 
 Pour une prise en main pas à pas, voir le [tutoriel](TUTORIAL.md) ; les
-pistes d'évolution sont dans [IMPROVEMENTS.md](IMPROVEMENTS.md).
+pistes d'évolution sont dans [IMPROVEMENTS.md](IMPROVEMENTS.md) et les
+tâches retenues dans [TODO.md](TODO.md).
 
 ## Prérequis
 
