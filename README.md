@@ -46,12 +46,13 @@ ln -s "$PWD/git4lazy.py" ~/.local/bin/git4lazy
 | Tab        | toutes                                           | Passer à la section suivante                            |
 | Espace     | toutes                                           | Sélectionner ou désélectionner un fichier               |
 | a          | Changes not staged for commit, Untracked files   | Ajouter les fichiers sélectionnés à l'index (`git add`) |
+| r          | Changes not staged for commit                    | Annuler les modifications des fichiers sélectionnés (`git restore`), après confirmation |
 | u          | Changes to be committed                          | Retirer les fichiers sélectionnés de l'index            |
 | c          | Changes to be committed                          | Saisir un titre et un message, puis `git commit`        |
-| r          | toutes                                           | Rafraîchir                                              |
+| F5         | toutes                                           | Rafraîchir                                              |
 | q          | toutes                                           | Quitter                                                 |
 
-Sans sélection, `a` et `u` agissent sur le fichier sous le curseur.
+Sans sélection, `a`, `r` et `u` agissent sur le fichier sous le curseur.
 La liste est rafraîchie après chaque action ; le résultat, ou l'erreur
 renvoyée par git, s'affiche en bas de l'écran.
 
@@ -61,7 +62,7 @@ renvoyée par git, s'affiche en bas de l'écran.
 |---------|-------------------------------------------------------|
 | Entrée  | Dans le titre : passer au message ; dans le message : nouvelle ligne |
 | Tab     | Changer de champ                                      |
-| Ctrl+D  | Valider (le titre est obligatoire)                    |
+| Ctrl+V  | Valider (le titre est obligatoire)                    |
 | Échap   | Annuler                                               |
 
 Le commit porte sur tout l'index, comme `git commit` : la sélection n'a pas
@@ -73,6 +74,10 @@ d'effet à cette étape.
   la copie de travail ni au dépôt. Avant le premier commit, faute de `HEAD`,
   c'est `git rm --cached` qui est employé ; à ce stade tous les fichiers
   indexés sont nouveaux, et les deux commandes reviennent au même.
+- **Annuler les modifications** (`r`) remet dans la copie de travail la
+  version de l'index : les modifications non indexées sont perdues
+  définitivement, celles déjà indexées sont conservées. Un fichier supprimé
+  est restauré. Une confirmation (`o`) est demandée avant.
 - Un fichier indexé puis modifié à nouveau apparaît dans les deux premières
   sections, comme dans `git status`.
 - Les noms de fichiers sont pris littéralement : `*` ou un `:` initial ne

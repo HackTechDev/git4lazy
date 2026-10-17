@@ -3,13 +3,14 @@
 
 Touches :
   ↑/↓ ou k/j   déplacer le curseur        Tab   changer de section
-  Espace       (dé)sélectionner           r     rafraîchir
+  Espace       (dé)sélectionner           F5    rafraîchir
   a            git add (Changes not staged for commit, Untracked files)
+  r            annuler les modifications (Changes not staged for commit)
   u            retirer de l'index (Changes to be committed)
   c            commit (Changes to be committed)
   q            quitter
 
-Sans sélection, a et u agissent sur le fichier sous le curseur.
+Sans sélection, a, r et u agissent sur le fichier sous le curseur.
 """
 
 import curses
@@ -30,8 +31,8 @@ STATUS_LABELS = {
 }
 BACKSPACE = (curses.KEY_BACKSPACE, "\x7f", "\b")
 ENTER = (curses.KEY_ENTER, "\n", "\r")
-ESCAPE, CTRL_D = "\x1b", "\x04"
-HELP = "Espace sélect.  a add  u unstage  c commit  Tab section  r rafraîchir  q quitter"
+ESCAPE, CTRL_V = "\x1b", "\x16"
+HELP = "Espace sélect.  a add  r restore  u unstage  c commit  Tab section  F5 rafraîchir  q quitter"
 
 
 # --- Git ---------------------------------------------------------------------
@@ -94,6 +95,12 @@ def git_unstage(entries):
     if git("rev-parse", "--verify", "--quiet", "HEAD").returncode == 0:
         return git("restore", "--staged", "--", *paths_of(entries))
     return git("rm", "--cached", "--quiet", "--", *paths_of(entries))
+
+
+def git_restore(entries):
+    # Remet la version de l'index dans la copie de travail : les modifications
+    # non indexées sont perdues, celles déjà indexées sont conservées.
+    return git("restore", "--", *paths_of(entries))
 
 
 def git_commit(title, body):
@@ -211,7 +218,7 @@ class CommitDialog:
                 title, body = self.fields
                 if key == ESCAPE:
                     return None
-                if key == CTRL_D:
+                if key == CTRL_V:
                     if title.text:
                         return title.text, body.text
                     self.error, self.active = "Le titre est obligatoire.", 0
@@ -243,7 +250,7 @@ class CommitDialog:
             if active:
                 cursor = pos
         put(win, height - 3, 2, self.error, curses.color_pair(2) | curses.A_BOLD)
-        put(win, height - 2, 2, "Ctrl+D valider · Tab changer de champ · Échap annuler", curses.A_DIM)
+        put(win, height - 2, 2, "Ctrl+V valider · Tab changer de champ · Échap annuler", curses.A_DIM)
         try:
             win.move(*cursor)
         except curses.error:
@@ -289,6 +296,12 @@ class App:
         else:
             self.notify(success)
 
+    def confirm(self, question):
+        self.notify(f"{question} (o/N)", error=True)
+        self.draw()
+        curses.doupdate()
+        return self.scr.get_wch() in ("o", "O", "y", "Y")
+
     def in_section(self, *sections):
         """Vérifie que le curseur est dans une des sections attendues par l'action."""
         if self.current is None or self.current.section not in sections:
@@ -299,11 +312,14 @@ class App:
 
     # Actions
 
-    def act(self, sections, action, done):
+    def act(self, sections, action, done, question=None):
         if not self.in_section(*sections):
             return
         targets = [e for e in self.items if e.section in sections and e in self.selected]
         targets = targets or [self.current]
+        if question and not self.confirm(question.format(n=len(targets))):
+            self.notify("Annulé.")
+            return
         result = action(targets)
         self.refresh()
         self.report(result, f"{len(targets)} fichier(s) {done}.")
@@ -331,7 +347,6 @@ class App:
         if self.current is None:
             return
         self.selected ^= {self.current}
-        self.cursor = min(self.cursor + 1, len(self.items) - 1)
 
     # Affichage
 
@@ -384,11 +399,14 @@ class App:
                 self.toggle()
             elif key == "a":
                 self.act((UNSTAGED, UNTRACKED), git_add, "ajouté(s) à l'index")
+            elif key == "r":
+                self.act((UNSTAGED,), git_restore, "restauré(s)",
+                         "Annuler les modifications de {n} fichier(s) ? Elles seront perdues.")
             elif key == "u":
                 self.act((STAGED,), git_unstage, "retiré(s) de l'index")
             elif key == "c":
                 self.commit()
-            elif key == "r":
+            elif key == curses.KEY_F5:
                 self.refresh()
 
 
