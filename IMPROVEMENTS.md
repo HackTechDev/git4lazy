@@ -61,11 +61,6 @@ modifications d'un fichier.
 **Piste** : dans la vue diff (`d`), sélectionner des blocs (hunks) avec
 Espace et les appliquer avec `git apply --cached`.
 
-### Corriger le dernier commit (amend) — S
-Oublier un fichier dans le dernier commit est courant.
-**Piste** : dans *Changes to be committed*, une touche qui ajoute les
-fichiers sélectionnés au dernier commit, s'il n'est pas poussé.
-
 ### Fichiers non suivis : ignorer ou supprimer — S
 **Piste** : `i` ajoute les fichiers sélectionnés au `.gitignore` ; `d` les
 supprime, après confirmation.
@@ -147,6 +142,9 @@ code. Ajouter un fichier `LICENSE` (MIT, GPL…) selon vos intentions.
 - **Pousser et récupérer depuis l'outil** (`git push`, `git fetch`) : ces
   opérations restent manuelles, pour éviter de pousser des commits par
   erreur. git4lazy ne communique jamais avec le dépôt distant.
+- **Corriger le dernier commit (amend)** : inutile, le même résultat
+  s'obtient en commitant les fichiers oubliés puis en squashant ce commit
+  avec le précédent dans la liste des commits (`s`).
 
 ## Par où commencer
 
@@ -154,5 +152,4 @@ Pour un maximum d'effet avec peu d'effort :
 
 1. Erreurs de `git status` ignorées (fiabilité, S)
 2. Tests de la couche git (M) : ils sécurisent tout le reste
-3. Amend (S)
-4. Licence (S)
+3. Licence (S)
