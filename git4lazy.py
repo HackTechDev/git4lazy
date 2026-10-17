@@ -4,6 +4,7 @@
 Touches :
   ↑/↓ ou k/j   déplacer le curseur        Tab   changer de section
   Espace       (dé)sélectionner           F5    rafraîchir
+  *            (dé)sélectionner toute la section du curseur
   a            git add (Changes not staged for commit, Untracked files)
   r            annuler les modifications (Changes not staged for commit)
   u            retirer de l'index (Changes to be committed)
@@ -37,9 +38,11 @@ BACKSPACE = (curses.KEY_BACKSPACE, "\x7f", "\b")
 ENTER = (curses.KEY_ENTER, "\n", "\r")
 ESCAPE, CTRL_V = "\x1b", "\x16"
 FILES, COMMITS = "files", "commits"
+COMMIT_ACTIONS = (("s", "s squash"), ("e", "e modifier le message"), ("r", "r reset"))
 HELP = {
-    FILES: "Espace sélect.  a add  r restore  u unstage  c commit  Tab section  → commits  F5 rafraîchir  q quitter",
-    COMMITS: "Espace sélect.  s squash  e modifier le message  r reset  ← fichiers  F5 rafraîchir  q quitter",
+    FILES: "Espace sélect.  * tout  a add  r restore  u unstage  c commit  Tab section  → commits  F5 rafraîchir  q quitter",
+    # {actions} : seulement les actions que la sélection de commits permet.
+    COMMITS: "Espace sélect.  {actions}← fichiers  F5 rafraîchir  q quitter",
 }
 
 
@@ -457,38 +460,55 @@ class App:
         self.refresh()
         self.report(result, result.stdout.splitlines()[0] if result.stdout else "Commit effectué.")
 
+    def chosen_commits(self):
+        """Positions des commits sélectionnés, du plus récent au plus ancien."""
+        return [i for i, c in enumerate(self.commits) if c[0] in self.selected_commits]
+
+    def commit_action_error(self, key):
+        """Raison pour laquelle l'action s, e ou r est impossible avec la sélection
+        actuelle, ou None si elle est possible."""
+        chosen = self.chosen_commits()
+        if key == "s":
+            if len(chosen) < 2:
+                return "Sélectionnez au moins deux commits avec Espace."
+            if chosen[-1] - chosen[0] + 1 != len(chosen):
+                return "Les commits sélectionnés doivent se suivre."
+        elif key == "e" and len(chosen) != 1:
+            return "Sélectionnez un seul commit avec Espace pour modifier son message."
+        elif key == "r" and chosen != [0]:
+            return "Sélectionnez uniquement le dernier commit (en haut de la liste) avec Espace."
+        return None
+
+    def check_commit_action(self, key):
+        error = self.commit_action_error(key)
+        if error:
+            self.notify(error, error=True)
+        return error is None
+
     def squash(self):
+        if not self.check_commit_action("s"):
+            return
         shas = [c[0] for c in self.commits]
-        chosen = [i for i, sha in enumerate(shas) if sha in self.selected_commits]
-        if len(chosen) < 2:
-            self.notify("Sélectionnez au moins deux commits avec Espace.", error=True)
-            return
+        chosen = self.chosen_commits()
         newest, oldest = chosen[0], chosen[-1]
-        if oldest - newest + 1 != len(chosen):
-            self.notify("Les commits sélectionnés doivent se suivre.", error=True)
-            return
         # Comme git rebase : titre du plus ancien, puis le reste des messages dans l'ordre.
         messages = [message_of(sha) for sha in reversed(shas[newest:oldest + 1])]
         title, _, first_body = messages[0].partition("\n")
         body = "\n\n".join(m for m in [first_body.strip(), *messages[1:]] if m)
         self.rewrite(shas, newest, oldest, "squash", "Squash", title, body,
-                     f"{len(chosen)} commits fusionnés en un seul.")
+                     f"{oldest - newest + 1} commits fusionnés en un seul.")
 
     def reword(self):
-        shas = [c[0] for c in self.commits]
-        chosen = [i for i, sha in enumerate(shas) if sha in self.selected_commits]
-        if len(chosen) != 1:
-            self.notify("Sélectionnez un seul commit avec Espace pour modifier son message.", error=True)
+        if not self.check_commit_action("e"):
             return
-        title, _, body = message_of(shas[chosen[0]]).partition("\n")
-        self.rewrite(shas, chosen[0], chosen[0], "reword", "Modifier le commit", title,
+        shas = [c[0] for c in self.commits]
+        index = self.chosen_commits()[0]
+        title, _, body = message_of(shas[index]).partition("\n")
+        self.rewrite(shas, index, index, "reword", "Modifier le commit", title,
                      body.strip(), "Message du commit modifié.")
 
     def undo_last_commit(self):
-        chosen = [i for i, c in enumerate(self.commits) if c[0] in self.selected_commits]
-        if chosen != [0]:
-            self.notify("Sélectionnez uniquement le dernier commit (en haut de la liste) avec Espace.",
-                        error=True)
+        if not self.check_commit_action("r"):
             return
         if not self.confirm("Annuler le dernier commit ? Ses modifications resteront dans les fichiers."):
             self.notify("Annulé.")
@@ -526,6 +546,16 @@ class App:
         if self.current is None:
             return
         self.selected ^= {self.current}
+
+    def toggle_section(self):
+        """Sélectionne toute la section du curseur, ou la désélectionne si elle l'était déjà."""
+        if self.current is None:
+            return
+        section = {e for e in self.items if e.section == self.current.section}
+        if section <= self.selected:
+            self.selected -= section
+        else:
+            self.selected |= section
 
     # Affichage
 
@@ -577,7 +607,9 @@ class App:
 
         put(scr, h - 2, 0, self.message,
             curses.color_pair(2) | curses.A_BOLD if self.message_is_error else curses.A_BOLD)
-        put(scr, h - 1, 0, HELP[self.view], curses.A_DIM)
+        actions = "".join(f"{label}  " for key, label in COMMIT_ACTIONS
+                          if self.commit_action_error(key) is None)
+        put(scr, h - 1, 0, HELP[self.view].format(actions=actions), curses.A_DIM)
         scr.noutrefresh()
 
     def run(self):
@@ -623,6 +655,8 @@ class App:
             self.jump_to_other_section()
         elif key == " ":
             self.toggle()
+        elif key == "*":
+            self.toggle_section()
         elif key == "a":
             self.act((UNSTAGED, UNTRACKED), git_add, "ajouté(s) à l'index")
         elif key == "r":
