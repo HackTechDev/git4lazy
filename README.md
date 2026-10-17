@@ -2,6 +2,8 @@
 
 Un `git status` interactif en mode terminal : sélectionnez des fichiers,
 ajoutez-les à l'index ou retirez-les, puis commitez sans quitter l'écran.
+Une seconde page liste les commits pas encore poussés, pour les fusionner
+(squash), corriger leur message ou annuler le dernier.
 
 ```
 Sur la branche main
@@ -16,6 +18,9 @@ Changes not staged for commit :
 Untracked files :
   [x] notes.txt
 ```
+
+Pour une prise en main pas à pas, voir le [tutoriel](TUTORIAL.md) ; les
+pistes d'évolution sont dans [IMPROVEMENTS.md](IMPROVEMENTS.md).
 
 ## Prérequis
 
@@ -40,11 +45,14 @@ ln -s "$PWD/git4lazy.py" ~/.local/bin/git4lazy
 
 ## Touches
 
+### Page des fichiers
+
 | Touche     | Section                                          | Action                                                  |
 |------------|--------------------------------------------------|---------------------------------------------------------|
 | ↑/↓ ou k/j | toutes                                           | Déplacer le curseur                                     |
 | Tab        | toutes                                           | Passer à la section suivante                            |
 | Espace     | toutes                                           | Sélectionner ou désélectionner un fichier               |
+| *          | toutes                                           | Sélectionner tous les fichiers de la section du curseur (ou tous les désélectionner s'ils l'étaient déjà) |
 | a          | Changes not staged for commit, Untracked files   | Ajouter les fichiers sélectionnés à l'index (`git add`) |
 | r          | Changes not staged for commit                    | Annuler les modifications des fichiers sélectionnés (`git restore`), après confirmation |
 | u          | Changes to be committed                          | Retirer les fichiers sélectionnés de l'index            |
@@ -85,6 +93,9 @@ dépôt distant, du plus récent au plus ancien.
 | r          | Annuler le dernier commit (`git reset HEAD~`)           |
 | ←          | Revenir aux fichiers                                    |
 
+La ligne d'aide en bas de l'écran ne montre `s`, `e` et `r` que lorsque la
+sélection en cours permet l'action.
+
 Pour un squash, les commits sélectionnés doivent être au moins deux et se
 suivre. Une fenêtre s'ouvre avec le titre du plus ancien et les messages
 des autres, modifiables ; Ctrl+V valide, Échap annule. Comme avec
@@ -103,7 +114,8 @@ Squash et modification sont refusés si l'historique concerné contient un merge
 Pour annuler le dernier commit, sélectionnez-le (le seul accepté est celui
 en haut de la liste) puis appuyez sur `r` et confirmez avec `o`. C'est
 l'équivalent de `git reset HEAD~` : le commit disparaît, ses modifications
-restent dans les fichiers mais ne sont plus indexées. Comme la liste ne
+restent dans les fichiers mais ne sont plus indexées (les autres fichiers
+qui étaient dans l'index en sont retirés aussi). Comme la liste ne
 montre que les commits non poussés, un commit déjà poussé ne peut pas être
 annulé ainsi.
 
