@@ -61,14 +61,6 @@ modifications d'un fichier.
 **Piste** : dans la vue diff (`d`), sélectionner des blocs (hunks) avec
 Espace et les appliquer avec `git apply --cached`.
 
-### Pousser et récupérer depuis l'outil — S
-La liste des commits non poussés invite à pousser, mais il faut changer de
-terminal. Elle peut aussi être périmée, puisqu'elle compare avec l'état du
-dépôt distant au dernier `fetch`.
-**Piste** : `P` pour `git push` (après confirmation), `f` pour `git fetch`.
-Lancer ces commandes en arrière-plan pour ne pas figer l'écran, ou afficher
-« en cours… ».
-
 ### Corriger le dernier commit (amend) — S
 Oublier un fichier dans le dernier commit est courant.
 **Piste** : dans *Changes to be committed*, une touche qui ajoute les
@@ -150,11 +142,17 @@ temps que les tests, pas avant.
 Le dépôt n'a pas de licence : légalement, personne ne peut réutiliser le
 code. Ajouter un fichier `LICENSE` (MIT, GPL…) selon vos intentions.
 
+## Écarté volontairement
+
+- **Pousser et récupérer depuis l'outil** (`git push`, `git fetch`) : ces
+  opérations restent manuelles, pour éviter de pousser des commits par
+  erreur. git4lazy ne communique jamais avec le dépôt distant.
+
 ## Par où commencer
 
 Pour un maximum d'effet avec peu d'effort :
 
 1. Erreurs de `git status` ignorées (fiabilité, S)
 2. Tests de la couche git (M) : ils sécurisent tout le reste
-3. Pousser et récupérer, amend (S chacun)
+3. Amend (S)
 4. Licence (S)

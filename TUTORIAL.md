@@ -220,8 +220,9 @@ fichiers qui étaient indexés sont eux aussi retirés de l'index.
 
 ## 7. Pousser
 
-git4lazy ne pousse pas lui-même. Une fois vos commits prêts, dans un autre
-terminal :
+git4lazy ne pousse pas lui-même, volontairement : pousser reste un geste
+manuel, pour ne jamais envoyer des commits par erreur. Une fois vos commits
+prêts, dans un autre terminal :
 
 ```sh
 git push
