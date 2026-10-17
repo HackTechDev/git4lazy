@@ -121,6 +121,17 @@ echo "Pain" >> courses.txt
 Revenez dans git4lazy et appuyez sur **F5** pour rafraîchir :
 `modified: courses.txt` apparaît dans *Changes not staged for commit*.
 
+### Voir ce qui a changé
+
+Placez le curseur sur `courses.txt` et appuyez sur **d** : le diff s'affiche
+en plein écran, avec la ligne `+Pain` en vert. Faites défiler avec ↑/↓ ou
+PgUp/PgDn, puis revenez à la liste avec **Échap** (ou ←, ou q).
+
+Le diff ne demande pas de sélection : il porte sur le fichier sous le
+curseur. Selon la section, il montre ce qui sera commité (*Changes to be
+committed*), ce qui n'est pas encore indexé (*Changes not staged for
+commit*) ou, pour un fichier non suivi, tout son contenu.
+
 ### Annuler la modification
 
 Imaginons que cette modification était une erreur.
@@ -159,6 +170,9 @@ du plus récent au plus ancien. Notre bac à sable n'a pas de dépôt distant,
 donc tous les commits y figurent. La **flèche gauche** ramène aux fichiers.
 
 On ne retouche que des commits non poussés : les modifier ne gêne personne.
+
+Pour voir le contenu d'un commit, placez le curseur dessus et appuyez sur
+**d** : la liste des fichiers modifiés s'affiche, suivie du diff.
 
 La ligne d'aide du bas s'adapte à votre sélection : elle n'affiche `s`, `e`
 ou `r` que lorsque l'action est possible. Sans sélection, aucune des trois

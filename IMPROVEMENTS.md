@@ -1,6 +1,6 @@
 # Améliorations possibles
 
-Pistes relevées en relisant le code (`git4lazy.py`, ~690 lignes) et en
+Pistes relevées en relisant le code (`git4lazy.py`, ~800 lignes) et en
 l'utilisant. Chaque point indique le problème, une piste de solution et
 un effort estimé (S : moins d'une heure, M : une demi-journée, L : plus).
 
@@ -55,17 +55,10 @@ question envoie `KEY_RESIZE`, compris comme « non ».
 
 ## 2. Fonctionnalités
 
-### Voir le diff — M
-C'est le manque le plus visible : impossible de vérifier ce qu'on va
-indexer, annuler ou commiter sans quitter l'outil.
-**Piste** : Entrée ouvre le diff du fichier sous le curseur (`git diff`,
-`git diff --cached`, ou le contenu pour un fichier non suivi) ; dans la
-liste des commits, Entrée affiche `git show --stat` puis le diff.
-
 ### Indexer une partie d'un fichier — L
 L'équivalent de `git add -p`, pour ne commiter qu'une partie des
 modifications d'un fichier.
-**Piste** : à partir de la vue diff, sélectionner des blocs (hunks) avec
+**Piste** : dans la vue diff (`d`), sélectionner des blocs (hunks) avec
 Espace et les appliquer avec `git apply --cached`.
 
 ### Pousser et récupérer depuis l'outil — S
@@ -163,6 +156,5 @@ Pour un maximum d'effet avec peu d'effort :
 
 1. Erreurs de `git status` ignorées (fiabilité, S)
 2. Tests de la couche git (M) : ils sécurisent tout le reste
-3. Voir le diff (M)
-4. Pousser et récupérer, amend (S chacun)
-5. Licence (S)
+3. Pousser et récupérer, amend (S chacun)
+4. Licence (S)

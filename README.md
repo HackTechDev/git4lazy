@@ -3,7 +3,8 @@
 Un `git status` interactif en mode terminal : sélectionnez des fichiers,
 ajoutez-les à l'index ou retirez-les, puis commitez sans quitter l'écran.
 Une seconde page liste les commits pas encore poussés, pour les fusionner
-(squash), corriger leur message ou annuler le dernier.
+(squash), corriger leur message ou annuler le dernier. Le diff d'un fichier
+ou d'un commit s'affiche en plein écran d'une touche.
 
 ```
 Sur la branche main
@@ -53,6 +54,7 @@ ln -s "$PWD/git4lazy.py" ~/.local/bin/git4lazy
 | Tab        | toutes                                           | Passer à la section suivante                            |
 | Espace     | toutes                                           | Sélectionner ou désélectionner un fichier               |
 | *          | toutes                                           | Sélectionner tous les fichiers de la section du curseur (ou tous les désélectionner s'ils l'étaient déjà) |
+| d          | toutes                                           | Afficher le diff du fichier sous le curseur             |
 | a          | Changes not staged for commit, Untracked files   | Ajouter les fichiers sélectionnés à l'index (`git add`) |
 | r          | Changes not staged for commit                    | Annuler les modifications des fichiers sélectionnés (`git restore`), après confirmation |
 | u          | Changes to be committed                          | Retirer les fichiers sélectionnés de l'index            |
@@ -91,6 +93,7 @@ dépôt distant, du plus récent au plus ancien.
 | s          | Squasher les commits sélectionnés en un seul            |
 | e          | Modifier le titre et le message du commit sélectionné   |
 | r          | Annuler le dernier commit (`git reset HEAD~`)           |
+| d          | Afficher le contenu du commit sous le curseur           |
 | ←          | Revenir aux fichiers                                    |
 
 La ligne d'aide en bas de l'écran ne montre `s`, `e` et `r` que lorsque la
@@ -123,6 +126,29 @@ La comparaison se fait avec la branche distante suivie (par exemple
 `origin/main`), telle que connue lors du dernier `git fetch` ou `git push` :
 aucun accès réseau n'est fait. Sans branche distante suivie, la liste montre
 les commits absents de toutes les branches distantes.
+
+### Vue diff
+
+`d` (ou `D`) ouvre le diff en plein écran, coloré : ajouts en vert,
+suppressions en rouge, en-têtes de blocs en cyan. Les lignes trop longues
+sont repliées.
+
+| Élément sous le curseur         | Contenu affiché                                     |
+|---------------------------------|-----------------------------------------------------|
+| Fichier de *Changes to be committed* | Ce qui sera commité (`git diff --cached`)      |
+| Fichier de *Changes not staged for commit* | Ce qui n'est pas encore indexé (`git diff`) |
+| Fichier de *Untracked files*    | Tout son contenu, comme un ajout                    |
+| Commit de la liste              | Fichiers modifiés puis diff (`git show --stat --patch`) |
+
+| Touche                 | Action                    |
+|------------------------|---------------------------|
+| ↑/↓ ou k/j             | Défiler d'une ligne       |
+| PgUp / PgDn ou Espace  | Défiler d'une page        |
+| Début / Fin ou g / G   | Aller au début / à la fin |
+| Échap, ←, q ou d       | Revenir à la liste        |
+
+Contrairement aux actions, le diff ne demande pas de sélection : il porte
+sur l'élément sous le curseur.
 
 ## Bon à savoir
 

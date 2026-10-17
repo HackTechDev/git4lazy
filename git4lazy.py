@@ -5,6 +5,7 @@ Touches :
   ↑/↓ ou k/j   déplacer le curseur        Tab   changer de section
   Espace       (dé)sélectionner           F5    rafraîchir
   *            (dé)sélectionner toute la section du curseur
+  d            diff du fichier sous le curseur (ou du commit, dans la liste des commits)
   a            git add (Changes not staged for commit, Untracked files)
   r            annuler les modifications (Changes not staged for commit)
   u            retirer de l'index (Changes to be committed)
@@ -40,9 +41,9 @@ ESCAPE, CTRL_V = "\x1b", "\x16"
 FILES, COMMITS = "files", "commits"
 COMMIT_ACTIONS = (("s", "s squash"), ("e", "e modifier le message"), ("r", "r reset"))
 HELP = {
-    FILES: "Espace sélect.  * tout  a add  r restore  u unstage  c commit  Tab section  → commits  F5 rafraîchir  q quitter",
+    FILES: "Espace sélect.  * tout  d diff  a add  r restore  u unstage  c commit  Tab section  → commits  F5 rafraîchir  q quitter",
     # {actions} : seulement les actions que la sélection de commits permet.
-    COMMITS: "Espace sélect.  {actions}← fichiers  F5 rafraîchir  q quitter",
+    COMMITS: "Espace sélect.  {actions}d diff  ← fichiers  F5 rafraîchir  q quitter",
 }
 
 
@@ -57,6 +58,11 @@ def has_head():
     return git("rev-parse", "--verify", "--quiet", "HEAD").returncode == 0
 
 
+def printable(text):
+    """Remplace les octets non UTF-8 (gardés tels quels pour git) avant affichage."""
+    return text.encode("utf-8", "surrogateescape").decode("utf-8", "replace")
+
+
 @dataclass(frozen=True)
 class Entry:
     section: int
@@ -65,8 +71,7 @@ class Entry:
 
     @property
     def label(self):
-        shown = [p.encode("utf-8", "surrogateescape").decode("utf-8", "replace")
-                 for p in self.paths]
+        shown = [printable(p) for p in self.paths]
         if self.section == UNTRACKED:
             return shown[0]
         target = f"{shown[1]} -> {shown[0]}" if len(shown) == 2 else shown[0]
@@ -161,6 +166,21 @@ def git_undo_last_commit():
     # Premier commit du dépôt : pas de parent, la branche redevient vide.
     result = git("update-ref", "-d", "HEAD")
     return result if result.returncode else git("rm", "-r", "--cached", "--quiet", ".")
+
+
+def file_diff(entry):
+    """Renvoie (description, texte du diff) d'un fichier selon sa section."""
+    options = ("--no-color", "--no-ext-diff")
+    if entry.section == STAGED:
+        return "indexé", git("diff", "--cached", *options, "--", *entry.paths).stdout
+    if entry.section == UNSTAGED:
+        return "non indexé", git("diff", *options, "--", *entry.paths).stdout
+    # Fichier non suivi : diff contre un fichier vide, soit tout son contenu en ajout.
+    return "non suivi", git("diff", "--no-index", *options, "--", os.devnull, entry.paths[0]).stdout
+
+
+def commit_diff(sha):
+    return git("show", "--stat", "--patch", "--no-color", "--no-ext-diff", sha).stdout
 
 
 def paths_of(entries):
@@ -368,6 +388,72 @@ class CommitDialog:
         curses.doupdate()
 
 
+def diff_attr(line):
+    if line.startswith(("diff --git", "index ", "+++ ", "--- ")):
+        return curses.A_BOLD
+    if line.startswith("+"):
+        return curses.color_pair(1)
+    if line.startswith("-"):
+        return curses.color_pair(2)
+    if line.startswith("@@"):
+        return curses.color_pair(4)
+    if line.startswith("commit "):
+        return curses.color_pair(3)
+    return 0
+
+
+class DiffView:
+    """Affichage plein écran d'un diff, défilant ; les lignes longues sont repliées."""
+
+    def __init__(self, scr, title, text):
+        self.scr = scr
+        self.title = title
+        self.lines = [printable(l).expandtabs(4) for l in text.splitlines()] or ["(aucune différence)"]
+        self.top = 0
+
+    def rows(self, width):
+        rows = []
+        for line in self.lines:
+            attr = diff_attr(line)
+            rows += [(line[i:i + width], attr) for i in range(0, len(line), width)] or [("", 0)]
+        return rows
+
+    def run(self):
+        while True:
+            h, w = self.scr.getmaxyx()
+            rows, page = self.rows(max(w - 1, 1)), max(h - 2, 1)
+            self.top = max(0, min(self.top, len(rows) - page))
+            self.draw(rows, page)
+            key = self.scr.get_wch()
+            if key in (ESCAPE, "q", "Q", "d", "D", curses.KEY_LEFT):
+                return
+            elif key in (curses.KEY_UP, "k"):
+                self.top -= 1
+            elif key in (curses.KEY_DOWN, "j"):
+                self.top += 1
+            elif key == curses.KEY_PPAGE:
+                self.top -= page
+            elif key in (curses.KEY_NPAGE, " "):
+                self.top += page
+            elif key in (curses.KEY_HOME, "g"):
+                self.top = 0
+            elif key in (curses.KEY_END, "G"):
+                self.top = len(rows)
+
+    def draw(self, rows, page):
+        scr = self.scr
+        scr.erase()
+        h, w = scr.getmaxyx()
+        put(scr, 0, 0, self.title.ljust(w), curses.A_REVERSE | curses.A_BOLD)
+        for y, (text, attr) in enumerate(rows[self.top:self.top + page], start=1):
+            put(scr, y, 0, text, attr)
+        last = min(self.top + page, len(rows))
+        put(scr, h - 1, 0, f"↑/↓ défiler  PgUp/PgDn page  Échap retour   "
+                           f"lignes {self.top + 1}-{last} sur {len(rows)}", curses.A_DIM)
+        scr.noutrefresh()
+        curses.doupdate()
+
+
 class App:
     def __init__(self, scr):
         self.scr = scr
@@ -383,6 +469,7 @@ class App:
             curses.init_pair(1, curses.COLOR_GREEN, -1)
             curses.init_pair(2, curses.COLOR_RED, -1)
             curses.init_pair(3, curses.COLOR_YELLOW, -1)
+            curses.init_pair(4, curses.COLOR_CYAN, -1)
         self.colors = {STAGED: curses.color_pair(1), UNSTAGED: curses.color_pair(2),
                        UNTRACKED: curses.color_pair(2)}
         self.refresh()
@@ -534,6 +621,18 @@ class App:
         self.refresh()
         self.report(result, done)
 
+    def show_file_diff(self):
+        if self.current is None:
+            return
+        where, text = file_diff(self.current)
+        DiffView(self.scr, f" {printable(self.current.paths[0])} ({where})", text).run()
+
+    def show_commit_diff(self):
+        if not self.commits:
+            return
+        sha, short, _, _, subject = self.commits[self.commit_cursor]
+        DiffView(self.scr, f" Commit {short} : {printable(subject)}", commit_diff(sha)).run()
+
     def jump_to_other_section(self):
         if self.current is None:
             return
@@ -642,6 +741,8 @@ class App:
             self.reword()
         elif key == "r":
             self.undo_last_commit()
+        elif key in ("d", "D"):
+            self.show_commit_diff()
 
     def handle_files_key(self, key):
         if key == curses.KEY_RIGHT:
@@ -657,6 +758,8 @@ class App:
             self.toggle()
         elif key == "*":
             self.toggle_section()
+        elif key in ("d", "D"):
+            self.show_file_diff()
         elif key == "a":
             self.act((UNSTAGED, UNTRACKED), git_add, "ajouté(s) à l'index")
         elif key == "r":
