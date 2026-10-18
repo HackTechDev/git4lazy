@@ -3,6 +3,40 @@
 Tâches retenues, par ordre de priorité. Les pistes encore à l'étude sont
 dans [IMPROVEMENTS.md](IMPROVEMENTS.md).
 
+## Priorité moyenne
+
+### Rafraîchissement automatique
+
+**Besoin** : la liste devrait se mettre à jour toute seule quand un fichier
+est ajouté, modifié ou supprimé, sans appuyer sur F5.
+
+**Approche retenue** : relire l'état à intervalle régulier. `scr.timeout(2000)`
+fait rendre la main à `get_wch()` au bout de 2 s sans touche (il lève alors
+`curses.error`) ; on relance `refresh()` et on redessine. Pas de
+surveillance des fichiers : la bibliothèque standard n'en fournit pas,
+`watchdog` est une dépendance externe, et `inotify` via `ctypes` ne
+marcherait que sous Linux.
+
+**À faire** :
+1. Dans `App.run()`, rafraîchir à l'expiration du délai. F5 reste
+   disponible pour forcer un rafraîchissement.
+2. **Garder le curseur sur le même fichier** (ou commit) : aujourd'hui
+   `self.cursor` est une position dans la liste. Si un fichier apparaît
+   au-dessus, le curseur glisserait sur un autre fichier à l'insu de
+   l'utilisateur, juste avant un `a` ou un `r`. Le recaler sur la même
+   entrée après chaque `refresh()`.
+3. Ne rien rafraîchir pendant la fenêtre de commit, une confirmation (o/N)
+   ou la vue diff : ces boucles ont leur propre `get_wch()`, il suffit de ne
+   pas y activer le délai.
+4. Ne pas effacer le message du bas lors d'un rafraîchissement automatique
+   (aujourd'hui `run()` le vide à chaque touche).
+5. Les sélections sont déjà conservées (`selected &= set(items)`) ; seule
+   celle d'un fichier disparu tombe.
+
+**À surveiller** : sur un très gros dépôt, `git status` peut dépasser une
+seconde. Si besoin, espacer l'intervalle ou ne relancer `git status` que si
+la date de modification de `.git/index` ou des dossiers a changé.
+
 ## Priorité basse
 
 ### Gérer les erreurs de `git status`
