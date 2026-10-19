@@ -55,6 +55,8 @@ The file has two layers, separated by `# --- Git ---` / `# --- Interface ---` ba
 - In the commits view, `commit_action_error(key)` is the single source of truth for whether `s`, `e` or `r` is allowed. It decides both the key's behaviour and the contextual help: `HELP[COMMITS]` has an `{actions}` placeholder filled from `COMMIT_ACTIONS`.
 - The diff key (`d`/`D`) is the exception to the selection rule: it acts on the item under the cursor.
 - Destructive or history-changing actions ask for confirmation with `App.confirm()`. Only `o`/`y` accepts.
+- Every git operation calls `App.show_busy(text)` first, so a waiting message is drawn before the (possibly slow) command runs; `report()` then replaces it with the result.
+- `HelpView` (`?` from any page, including the diff view) renders `HELP_SCREEN` and opens on the current page's section (`HELP_PAGE`). It shares scrolling with `DiffView` through `scrolled()`.
 
 ## Product decisions (do not revisit without being asked)
 

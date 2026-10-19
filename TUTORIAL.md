@@ -107,7 +107,8 @@ son passage dans l'index est annulé.
 6. git4lazy demande confirmation : appuyez sur **o** pour commiter. Toute
    autre touche ramène à la fenêtre, avec le titre et le message conservés.
 
-Le message du bas affiche la sortie de git, par exemple
+Pendant le commit, la ligne du bas indique « Commit de 1 fichier(s) en
+cours… » ; une fois terminé, elle affiche la sortie de git, par exemple
 `[main (commit racine) 1a2b3c4] Ajoute le fichier de bienvenue`.
 
 > Seuls les fichiers sélectionnés sont commités. Si d'autres fichiers sont

@@ -1,6 +1,6 @@
 # Améliorations possibles
 
-Pistes relevées en relisant le code (`git4lazy.py`, ~800 lignes) et en
+Pistes relevées en relisant le code (`git4lazy.py`, ~1150 lignes) et en
 l'utilisant. Chaque point indique le problème, une piste de solution et
 un effort estimé (S : moins d'une heure, M : une demi-journée, L : plus).
 Les tâches retenues passent dans [TODO.md](TODO.md).

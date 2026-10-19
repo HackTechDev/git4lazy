@@ -25,9 +25,9 @@ marcherait que sous Linux.
    au-dessus, le curseur glisserait sur un autre fichier à l'insu de
    l'utilisateur, juste avant un `a` ou un `r`. Le recaler sur la même
    entrée après chaque `refresh()`.
-3. Ne rien rafraîchir pendant la fenêtre de commit, une confirmation (o/N)
-   ou la vue diff : ces boucles ont leur propre `get_wch()`, il suffit de ne
-   pas y activer le délai.
+3. Ne rien rafraîchir pendant la fenêtre de commit, une confirmation (o/N),
+   la vue diff ou la fenêtre d'aide : ces boucles ont leur propre
+   `get_wch()`, il suffit de ne pas y activer le délai.
 4. Ne pas effacer le message du bas lors d'un rafraîchissement automatique
    (aujourd'hui `run()` le vide à chaque touche).
 5. Les sélections sont déjà conservées (`selected &= set(items)`) ; seule

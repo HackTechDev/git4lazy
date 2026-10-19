@@ -198,6 +198,10 @@ sur l'élément sous le curseur.
   version de l'index : les modifications non indexées sont perdues
   définitivement, celles déjà indexées sont conservées. Un fichier supprimé
   est restauré. Une confirmation (`o`) est demandée avant.
+- Pendant une opération git (ajout, retrait, restauration, commit, squash,
+  changement de message, annulation du dernier commit), la ligne du bas
+  affiche un message d'attente, par exemple « Commit de 2 fichier(s) en
+  cours… », remplacé par le résultat une fois l'opération terminée.
 - Un fichier indexé puis modifié à nouveau apparaît dans les deux premières
   sections, comme dans `git status`.
 - Les noms de fichiers sont pris littéralement : `*` ou un `:` initial ne
