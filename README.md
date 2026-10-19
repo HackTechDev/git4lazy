@@ -47,6 +47,10 @@ ln -s "$PWD/git4lazy.py" ~/.local/bin/git4lazy
 
 ## Touches
 
+Dans l'application, `?` ouvre une fenêtre d'aide qui liste tous les
+raccourcis clavier, page par page, en commençant par ceux de la page où
+vous êtes. Elle défile comme la vue diff et se ferme avec Échap ou `?`.
+
 ### Page des fichiers
 
 | Touche     | Section                                          | Action                                                  |
@@ -62,6 +66,7 @@ ln -s "$PWD/git4lazy.py" ~/.local/bin/git4lazy
 | c          | Changes to be committed                          | Saisir un titre et un message, puis commiter les fichiers sélectionnés, après confirmation |
 | →          | toutes                                           | Afficher les commits non poussés                        |
 | F5         | toutes                                           | Rafraîchir                                              |
+| ?          | toutes                                           | Afficher l'aide : tous les raccourcis clavier           |
 | q          | toutes                                           | Quitter                                                 |
 
 `a`, `r`, `u` et `c` n'agissent que sur les fichiers sélectionnés : sans
@@ -101,6 +106,7 @@ dépôt distant, du plus récent au plus ancien.
 | r          | Annuler le dernier commit (`git reset HEAD~`)           |
 | d          | Afficher le contenu du commit sous le curseur           |
 | ←          | Revenir aux fichiers                                    |
+| ?          | Afficher l'aide                                         |
 
 La ligne d'aide en bas de l'écran ne montre `s`, `e` et `r` que lorsque la
 sélection en cours permet l'action.
@@ -176,6 +182,7 @@ haut de l'écran.
 | h                      | Masquer ou afficher les en-têtes git |
 | n / p                  | Aller à la modification suivante / précédente |
 | Début / Fin ou g / G   | Aller au début / à la fin |
+| ?                      | Afficher l'aide           |
 | Échap, ←, q ou d       | Revenir à la liste        |
 
 Contrairement aux actions, le diff ne demande pas de sélection : il porte

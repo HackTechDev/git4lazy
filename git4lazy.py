@@ -17,6 +17,7 @@ Touches :
                Espace pour sélectionner, s pour squasher les commits choisis,
                e pour modifier le message du commit choisi,
                r pour annuler le dernier commit (git reset HEAD~)
+  ?            aide : tous les raccourcis clavier
   q            quitter
 
 a, r, u et c n'agissent que sur les fichiers sélectionnés de la section.
@@ -52,10 +53,63 @@ FILE_ACTION_SECTIONS = {key: sections for key, _, sections in FILE_ACTIONS}
 COMMIT_ACTIONS = (("s", "s squash"), ("e", "e modifier le message"), ("r", "r reset"))
 HELP = {
     # {actions} : seulement les actions possibles dans la section du curseur.
-    FILES: "Espace sélect.  * tout  d diff  {actions}Tab section  → commits  F5 rafraîchir  q quitter",
+    # « ? aide » en tête : la ligne est coupée sur un terminal étroit.
+    FILES: "? aide  Espace sélect.  * tout  d diff  {actions}Tab section  → commits  F5 rafraîchir  q quitter",
     # {actions} : seulement les actions que la sélection de commits permet.
-    COMMITS: "Espace sélect.  {actions}d diff  ← fichiers  F5 rafraîchir  q quitter",
+    COMMITS: "? aide  Espace sélect.  {actions}d diff  ← fichiers  F5 rafraîchir  q quitter",
 }
+# Fenêtre d'aide (?) : tous les raccourcis, page par page. À tenir à jour avec
+# les touches, comme les lignes d'aide ci-dessus et le README.
+HELP_SCREEN = (
+    ("Page des fichiers", (
+        ("↑/↓  k/j", "Déplacer le curseur"),
+        ("Tab", "Passer à la section suivante"),
+        ("Espace", "Sélectionner ou désélectionner un fichier"),
+        ("*", "Tout sélectionner dans la section (ou tout désélectionner)"),
+        ("d", "Diff du fichier sous le curseur"),
+        ("a", "Ajouter à l'index (Changes not staged, Untracked files)"),
+        ("r", "Annuler les modifications, après confirmation (Changes not staged)"),
+        ("u", "Retirer de l'index (Changes to be committed)"),
+        ("c", "Commiter les fichiers sélectionnés (Changes to be committed)"),
+        ("→", "Liste des commits non poussés"),
+        ("F5", "Rafraîchir"),
+        ("?", "Cette aide"),
+        ("q", "Quitter"),
+    )),
+    ("Liste des commits non poussés", (
+        ("↑/↓  k/j", "Parcourir la liste"),
+        ("Espace", "Sélectionner ou désélectionner un commit"),
+        ("s", "Squasher les commits sélectionnés (au moins deux, qui se suivent)"),
+        ("e", "Modifier le message du commit sélectionné (un seul)"),
+        ("r", "Annuler le dernier commit (git reset HEAD~), après confirmation"),
+        ("d", "Contenu du commit sous le curseur"),
+        ("←", "Revenir aux fichiers"),
+        ("F5", "Rafraîchir"),
+        ("?", "Cette aide"),
+        ("q", "Quitter"),
+    )),
+    ("Fenêtre de commit, de squash et de message", (
+        ("Entrée", "Dans le titre : passer au message ; dans le message : nouvelle ligne"),
+        ("Tab", "Changer de champ"),
+        ("Ctrl+S", "Valider (le titre est obligatoire)"),
+        ("Échap", "Annuler"),
+    )),
+    ("Vue diff", (
+        ("↑/↓  k/j", "Défiler d'une ligne"),
+        ("PgUp/PgDn  Espace", "Défiler d'une page"),
+        ("Début/Fin  g/G", "Aller au début / à la fin"),
+        ("n / p", "Modification suivante / précédente"),
+        ("v", "Basculer entre côte à côte et unifié"),
+        ("h", "Masquer ou afficher les en-têtes git"),
+        ("?", "Cette aide"),
+        ("Échap  ←  q  d", "Revenir à la liste"),
+    )),
+    ("Confirmations (o/N)", (
+        ("o", "Valider"),
+        ("autre touche", "Annuler"),
+    )),
+)
+HELP_PAGE = {FILES: "Page des fichiers", COMMITS: "Liste des commits non poussés"}
 
 
 # --- Git ---------------------------------------------------------------------
@@ -479,6 +533,65 @@ def compact_headers(lines):
     return out
 
 
+def scrolled(key, top, page, total):
+    """Première ligne visible après une touche de défilement, ou None si la
+    touche ne fait pas défiler."""
+    steps = {curses.KEY_UP: -1, "k": -1, curses.KEY_DOWN: 1, "j": 1,
+             curses.KEY_PPAGE: -page, curses.KEY_NPAGE: page, " ": page}
+    if key in steps:
+        return top + steps[key]
+    if key in (curses.KEY_HOME, "g"):
+        return 0
+    if key in (curses.KEY_END, "G"):
+        return total
+    return None
+
+
+class HelpView:
+    """Fenêtre d'aide plein écran : tous les raccourcis clavier, page par page,
+    ouverte sur la section de la page d'où on vient."""
+
+    KEY_WIDTH = 20
+
+    def __init__(self, scr, section):
+        self.scr = scr
+        self.rows, self.top = [], 0
+        for title, keys in HELP_SCREEN:
+            if title == section:
+                self.top = len(self.rows)
+            self.rows.append((title, None))
+            self.rows += keys
+            self.rows.append(("", ""))
+
+    def run(self):
+        while True:
+            h, w = self.scr.getmaxyx()
+            page = max(h - 2, 1)
+            self.top = max(0, min(self.top, len(self.rows) - page))
+            self.draw(page)
+            key = self.scr.get_wch()
+            if key in ("?", ESCAPE, "q", "Q", curses.KEY_LEFT):
+                return
+            top = scrolled(key, self.top, page, len(self.rows))
+            if top is not None:
+                self.top = top
+
+    def draw(self, page):
+        scr = self.scr
+        scr.erase()
+        h, w = scr.getmaxyx()
+        put(scr, 0, 0, " Aide : raccourcis clavier".ljust(w), curses.A_REVERSE | curses.A_BOLD)
+        for y, (key, text) in enumerate(self.rows[self.top:self.top + page], start=1):
+            if text is None:  # titre de section
+                put(scr, y, 0, key, curses.A_BOLD | curses.A_UNDERLINE)
+            else:
+                put(scr, y, 2, key, curses.color_pair(4) | curses.A_BOLD)
+                put(scr, y, 2 + self.KEY_WIDTH, text)
+        put(scr, h - 1, 0, "↑/↓ défiler  PgUp/PgDn page  Échap ou ? fermer", curses.A_DIM)
+        scr.noutrefresh()
+        curses.doupdate()
+
+
 HUNK_HEADER = re.compile(r"@@ -(\d+)(?:,\d+)? \+(\d+)")
 
 
@@ -621,6 +734,9 @@ class DiffView:
             if key in ("n", "N", "p", "P"):
                 self.jump(changes, forward=key in ("n", "N"))
                 continue
+            if key == "?":
+                HelpView(self.scr, "Vue diff").run()
+                continue
             # Tout autre déplacement abandonne la modification atteinte par n ou p.
             self.mark = None
             if key in (ESCAPE, "q", "Q", "d", "D", curses.KEY_LEFT):
@@ -633,18 +749,10 @@ class DiffView:
                 else:
                     DiffView.hide_headers = not DiffView.hide_headers
                 self.top = int(fraction * len(self.rows(max(w - 1, 1))[0]))
-            elif key in (curses.KEY_UP, "k"):
-                self.top -= 1
-            elif key in (curses.KEY_DOWN, "j"):
-                self.top += 1
-            elif key == curses.KEY_PPAGE:
-                self.top -= page
-            elif key in (curses.KEY_NPAGE, " "):
-                self.top += page
-            elif key in (curses.KEY_HOME, "g"):
-                self.top = 0
-            elif key in (curses.KEY_END, "G"):
-                self.top = len(rows)
+            else:
+                top = scrolled(key, self.top, page, len(rows))
+                if top is not None:
+                    self.top = top
 
     def draw(self, rows, changes, page):
         scr = self.scr
@@ -965,6 +1073,8 @@ class App:
                 return
             elif key == curses.KEY_F5:
                 self.refresh()
+            elif key == "?":
+                HelpView(self.scr, HELP_PAGE[self.view]).run()
             elif self.view == COMMITS:
                 self.handle_commits_key(key)
             else:

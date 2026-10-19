@@ -105,10 +105,6 @@ deux opérations suivantes les plus demandées dans ce type d'outil.
 **Piste** : une troisième page (flèche droite depuis les commits) listant
 les branches et les remises.
 
-### Aide intégrée — S
-La ligne d'aide du bas est tronquée sur un terminal étroit.
-**Piste** : `?` affiche une fenêtre avec toutes les touches de la page.
-
 ### Message de commit : longueurs conseillées — S
 **Piste** : afficher le nombre de caractères du titre, en orange au-delà de
 50 et en rouge au-delà de 72, comme le font la plupart des éditeurs.

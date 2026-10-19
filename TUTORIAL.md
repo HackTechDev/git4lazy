@@ -60,6 +60,10 @@ la dernière rappelle les touches. Elle s'adapte à la section du curseur :
 `a add` n'apparaît que dans *Changes not staged for commit* et *Untracked
 files*, `u unstage` et `c commit` que dans *Changes to be committed*.
 
+En cas de doute, appuyez sur **?** : une fenêtre liste tous les raccourcis
+clavier, en commençant par ceux de la page où vous êtes. **Échap** (ou **?**)
+la referme.
+
 ## 2. Ajouter des fichiers à l'index
 
 Ajoutons `bonjour.txt` et `courses.txt`, mais pas le brouillon.

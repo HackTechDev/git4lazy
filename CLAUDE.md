@@ -67,7 +67,7 @@ Both decisions are recorded under « Écarté volontairement » in `IMPROVEMENTS
 
 When a key or behaviour changes, update all of these:
 - the module docstring of `git4lazy.py`;
-- the `HELP` strings;
+- the `HELP` strings (bottom help line) and `HELP_SCREEN` (the `?` help window);
 - `README.md`, the key tables per page;
 - `TUTORIAL.md`, the step-by-step walkthrough;
 - `IMPROVEMENTS.md`: remove ideas once they are implemented or rejected;
