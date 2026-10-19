@@ -133,8 +133,12 @@ Placez le curseur sur `courses.txt` et appuyez sur **d** : le diff s'affiche
 en plein écran, côte à côte : l'ancienne version à gauche, la nouvelle à
 droite, où la ligne `Pain` apparaît en vert. Appuyez sur **v** pour passer
 au diff unifié de `git diff` (la ligne devient `+Pain`), et de nouveau sur
-**v** pour revenir. Faites défiler avec ↑/↓ ou PgUp/PgDn, puis revenez à la
-liste avec **Échap** (ou ←, ou q).
+**v** pour revenir. Les lignes `diff --git`, `index`, `---` et `+++` en
+tête du diff sont des informations techniques de git : **h** les remplace
+par le seul nom du fichier, `courses.txt`, et un second **h** les
+réaffiche. Faites défiler avec ↑/↓ ou PgUp/PgDn ; dans un long diff,
+**n** et **p** sautent directement à la modification suivante ou
+précédente. Revenez à la liste avec **Échap** (ou ←, ou q).
 
 Le diff ne demande pas de sélection : il porte sur le fichier sous le
 curseur. Selon la section, il montre ce qui sera commité (*Changes to be

@@ -6,7 +6,8 @@ Touches :
   Espace       (dé)sélectionner           F5    rafraîchir
   *            (dé)sélectionner toute la section du curseur
   d            diff du fichier sous le curseur (ou du commit, dans la liste des commits),
-               côte à côte ou unifié (v pour basculer)
+               côte à côte ou unifié (v pour basculer) ; h masque les en-têtes git ;
+               n / p : modification suivante / précédente
   a            git add (Changes not staged for commit, Untracked files)
   r            annuler les modifications (Changes not staged for commit)
   u            retirer de l'index (Changes to be committed)
@@ -183,19 +184,25 @@ def git_undo_last_commit():
     return result if result.returncode else git("rm", "-r", "--cached", "--quiet", ".")
 
 
+# Préfixes a/ et b/ imposés (compact_headers() les retire), quelle que soit la
+# configuration (diff.noprefix, diff.mnemonicPrefix) ; chemins accentués lisibles.
+DIFF_OPTIONS = ("--no-color", "--no-ext-diff", "--src-prefix=a/", "--dst-prefix=b/")
+UNQUOTED = ("-c", "core.quotePath=false")
+
+
 def file_diff(entry):
     """Renvoie (description, texte du diff) d'un fichier selon sa section."""
-    options = ("--no-color", "--no-ext-diff")
     if entry.section == STAGED:
-        return "indexé", git("diff", "--cached", *options, "--", *entry.paths).stdout
+        return "indexé", git(*UNQUOTED, "diff", "--cached", *DIFF_OPTIONS, "--", *entry.paths).stdout
     if entry.section == UNSTAGED:
-        return "non indexé", git("diff", *options, "--", *entry.paths).stdout
+        return "non indexé", git(*UNQUOTED, "diff", *DIFF_OPTIONS, "--", *entry.paths).stdout
     # Fichier non suivi : diff contre un fichier vide, soit tout son contenu en ajout.
-    return "non suivi", git("diff", "--no-index", *options, "--", os.devnull, entry.paths[0]).stdout
+    return "non suivi", git(*UNQUOTED, "diff", "--no-index", *DIFF_OPTIONS, "--",
+                            os.devnull, entry.paths[0]).stdout
 
 
 def commit_diff(sha):
-    return git("show", "--stat", "--patch", "--no-color", "--no-ext-diff", sha).stdout
+    return git(*UNQUOTED, "show", "--stat", "--patch", *DIFF_OPTIONS, sha).stdout
 
 
 def paths_of(entries):
@@ -417,6 +424,64 @@ def diff_attr(line):
     return 0
 
 
+HEADER_PREFIXES = ("index ", "--- ", "+++ ", "new file mode", "deleted file mode", "old mode",
+                   "new mode", "similarity index", "dissimilarity index", "rename from",
+                   "rename to", "copy from", "copy to")
+
+
+def file_title(header):
+    """Nom du fichier décrit par un en-tête « diff --git a/… b/… » et ses lignes."""
+    fields = {}
+    for line in header[1:]:
+        for key in ("--- ", "+++ ", "rename from ", "rename to ", "copy from ", "copy to "):
+            if line.startswith(key):
+                # git termine par une tabulation un nom qui contient une espace ;
+                # la vue l'a déjà convertie en espaces (expandtabs).
+                fields[key] = line[len(key):].rstrip()
+
+    def unprefix(path):
+        return None if path in (None, "/dev/null") else path[2:]
+
+    old = fields.get("rename from ") or fields.get("copy from ") or unprefix(fields.get("--- "))
+    new = fields.get("rename to ") or fields.get("copy to ") or unprefix(fields.get("+++ "))
+    if old is None and new is None:
+        # Ni --- ni +++ (changement de droits, fichier binaire) : « a/X b/X ».
+        rest = header[0][len("diff --git "):]
+        title = rest[2:2 + (len(rest) - 5) // 2]
+    elif new is None:
+        title = f"{old} (supprimé)"
+    elif old is None:
+        title = f"{new} (nouveau fichier)"
+    else:
+        title = new if old == new else f"{old} → {new}"
+    if any(line.startswith("old mode") for line in header):
+        title += " (droits modifiés)"
+    return title
+
+
+def compact_headers(lines):
+    """Remplace chaque en-tête de fichier (diff --git, index, ---, +++…) par le
+    seul nom du fichier, précédé d'une ligne vide. Renvoie des couples
+    (ligne, attribut imposé ou None)."""
+    out, i = [], 0
+    while i < len(lines):
+        if not lines[i].startswith("diff --git "):
+            out.append((lines[i], None))
+            i += 1
+            continue
+        end = i + 1
+        while end < len(lines) and lines[end].startswith(HEADER_PREFIXES):
+            end += 1
+        if out and out[-1][0]:
+            out.append(("", 0))
+        out.append((file_title(lines[i:end]), curses.A_BOLD))
+        i = end
+    return out
+
+
+HUNK_HEADER = re.compile(r"@@ -(\d+)(?:,\d+)? \+(\d+)")
+
+
 def wrap_full(line, width, attr):
     """Ligne pleine largeur, repliée en morceaux de width colonnes."""
     return [[(0, line[i:i + width], attr)] for i in range(0, len(line), width)] or [[(0, "", 0)]]
@@ -427,30 +492,55 @@ class DiffView:
 
     Deux modes, basculés avec v : côte à côte (avant à gauche, après à droite)
     ou unifié, comme git diff. Le mode choisi est gardé pour les diffs suivants.
+    n et p sautent à la modification suivante ou précédente.
     """
 
     side_by_side = True
+    hide_headers = False  # h : en-têtes git réduits au nom du fichier
     MIN_SIDE_WIDTH = 60  # en dessous, les colonnes seraient illisibles : mode unifié
+    CONTEXT = 3  # lignes laissées au-dessus d'une modification atteinte par n ou p
 
     def __init__(self, scr, title, text):
         self.scr = scr
         self.title = title
         self.lines = [printable(l).expandtabs(4) for l in text.splitlines()] or ["(aucune différence)"]
         self.top = 0
+        self.mark = None  # ligne d'écran de la modification atteinte par n ou p
+
+    def display_lines(self):
+        """Couples (ligne, attribut imposé ou None) à afficher."""
+        if DiffView.hide_headers:
+            return compact_headers(self.lines)
+        return [(line, None) for line in self.lines]
 
     def rows(self, width):
-        """Lignes à l'écran, chacune une liste de segments (colonne, texte, attribut)."""
+        """Renvoie (lignes à l'écran, débuts des modifications).
+
+        Chaque ligne est une liste de segments (colonne, texte, attribut) ; une
+        modification est une suite de lignes supprimées ou ajoutées, et son début
+        est donné par son numéro de ligne à l'écran.
+        """
         if DiffView.side_by_side and width >= self.MIN_SIDE_WIDTH:
             return self.side_rows(width)
-        rows = []
-        for line in self.lines:
-            rows += wrap_full(line, width, diff_attr(line))
-        return rows
+        rows, changes = [], []
+        in_hunk = in_change = False
+        for line, forced in self.display_lines():
+            kind = line[:1] if forced is None else ""
+            if in_hunk and kind in ("-", "+"):
+                if not in_change:
+                    changes.append(len(rows))
+                in_change = True
+            elif in_hunk and kind == " ":
+                in_change = False
+            elif not (in_hunk and kind == "\\"):
+                in_hunk, in_change = bool(HUNK_HEADER.match(line)), False
+            rows += wrap_full(line, width, diff_attr(line) if forced is None else forced)
+        return rows, changes
 
     def side_rows(self, width):
         column = (width - 3) // 2  # séparateur « │ » central sur 3 colonnes
         text_width = column - 5    # numéro de ligne sur 4 colonnes + espace
-        rows, removed, added = [], [], []
+        rows, changes, removed, added = [], [], [], []
         old_no = new_no = 0
         in_hunk = False
 
@@ -474,13 +564,16 @@ class DiffView:
 
         def flush():
             # Lignes supprimées et ajoutées d'un même bloc, mises en regard.
+            if removed or added:
+                changes.append(len(rows))
             for i in range(max(len(removed), len(added))):
                 pair(removed[i] if i < len(removed) else None, added[i] if i < len(added) else None)
             removed.clear()
             added.clear()
 
-        for line in self.lines:
-            kind = line[:1]
+        for line, forced in self.display_lines():
+            # Une ligne à attribut imposé (nom de fichier) n'est jamais du contenu.
+            kind = line[:1] if forced is None else ""
             if in_hunk and kind == "-":
                 removed.append((old_no, line[1:], curses.color_pair(2)))
                 old_no += 1
@@ -496,28 +589,50 @@ class DiffView:
                 # « \ No newline at end of file » reste dans le bloc ; un diff
                 # combiné (@@@, commit de merge) s'affiche tel quel.
                 if not (in_hunk and kind == "\\"):
-                    header = re.match(r"@@ -(\d+)(?:,\d+)? \+(\d+)", line)
+                    header = HUNK_HEADER.match(line)
                     in_hunk = bool(header)
                     if header:
                         old_no, new_no = int(header.group(1)), int(header.group(2))
-                rows += wrap_full(line, width, curses.A_DIM if kind == "\\" else diff_attr(line))
+                attr = forced if forced is not None else curses.A_DIM if kind == "\\" else diff_attr(line)
+                rows += wrap_full(line, width, attr)
         flush()
-        return rows
+        return rows, changes
+
+    def jump(self, changes, forward):
+        """Va à la modification suivante (ou précédente) : après (ou avant) celle
+        atteinte par le dernier n/p, sinon après (ou avant) le haut de l'écran."""
+        if self.mark is not None:
+            targets = [r for r in changes if r > self.mark] if forward else \
+                      [r for r in changes if r < self.mark]
+        else:
+            targets = [r for r in changes if r >= self.top] if forward else \
+                      [r for r in changes if r < self.top]
+        if targets:
+            self.mark = targets[0] if forward else targets[-1]
+            self.top = self.mark - self.CONTEXT
 
     def run(self):
         while True:
             h, w = self.scr.getmaxyx()
-            rows, page = self.rows(max(w - 1, 1)), max(h - 2, 1)
+            (rows, changes), page = self.rows(max(w - 1, 1)), max(h - 2, 1)
             self.top = max(0, min(self.top, len(rows) - page))
-            self.draw(rows, page)
+            self.draw(rows, changes, page)
             key = self.scr.get_wch()
+            if key in ("n", "N", "p", "P"):
+                self.jump(changes, forward=key in ("n", "N"))
+                continue
+            # Tout autre déplacement abandonne la modification atteinte par n ou p.
+            self.mark = None
             if key in (ESCAPE, "q", "Q", "d", "D", curses.KEY_LEFT):
                 return
-            elif key in ("v", "V"):
+            elif key in ("v", "V", "h", "H"):
                 # Garde à peu près la même position dans le diff.
                 fraction = self.top / max(len(rows), 1)
-                DiffView.side_by_side = not DiffView.side_by_side
-                self.top = int(fraction * len(self.rows(max(w - 1, 1))))
+                if key in ("v", "V"):
+                    DiffView.side_by_side = not DiffView.side_by_side
+                else:
+                    DiffView.hide_headers = not DiffView.hide_headers
+                self.top = int(fraction * len(self.rows(max(w - 1, 1))[0]))
             elif key in (curses.KEY_UP, "k"):
                 self.top -= 1
             elif key in (curses.KEY_DOWN, "j"):
@@ -531,14 +646,16 @@ class DiffView:
             elif key in (curses.KEY_END, "G"):
                 self.top = len(rows)
 
-    def draw(self, rows, page):
+    def draw(self, rows, changes, page):
         scr = self.scr
         scr.erase()
         h, w = scr.getmaxyx()
         put(scr, 0, 0, self.title.ljust(w), curses.A_REVERSE | curses.A_BOLD)
         for y, row in enumerate(rows[self.top:self.top + page], start=1):
+            # Première ligne de la modification atteinte par n ou p : en gras.
+            bold = curses.A_BOLD if self.top + y - 1 == self.mark else 0
             for x, text, attr in row:
-                put(scr, y, x, text, attr)
+                put(scr, y, x, text, attr | bold)
         # Le mode passe en tête : sur un terminal étroit, la fin de la ligne est coupée.
         if not DiffView.side_by_side:
             mode = "v côte à côte"
@@ -546,9 +663,15 @@ class DiffView:
             mode = "trop étroit : unifié"
         else:
             mode = "v unifié"
+        headers = "h afficher en-têtes" if DiffView.hide_headers else "h masquer en-têtes"
+        if self.mark in changes:
+            position = f"modification {changes.index(self.mark) + 1} sur {len(changes)}"
+        else:
+            position = f"{len(changes)} modification(s)"
         last = min(self.top + page, len(rows))
-        put(scr, h - 1, 0, f"{mode}  ↑/↓ défiler  PgUp/PgDn page  Échap retour   "
-                           f"lignes {self.top + 1}-{last} sur {len(rows)}", curses.A_DIM)
+        put(scr, h - 1, 0, f"{mode}  {position}  n/p modif. suiv./préc.  {headers}  ↑/↓ défiler  "
+                           f"PgUp/PgDn page  Échap retour  lignes {self.top + 1}-{last} sur {len(rows)}",
+            curses.A_DIM)
         scr.noutrefresh()
         curses.doupdate()
 

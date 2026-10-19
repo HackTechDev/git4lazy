@@ -147,6 +147,20 @@ gardé pour les diffs suivants. Sur un terminal de moins de 60 colonnes, le
 diff reste unifié. Le diff combiné d'un commit de merge s'affiche toujours
 tel que git le produit.
 
+`h` masque les en-têtes techniques de git (`diff --git`, `index`, `---`,
+`+++`…) : chaque fichier n'est plus annoncé que par son nom, en gras,
+précédé d'une ligne vide. Le nom précise si besoin « (nouveau fichier) »,
+« (supprimé) », « (droits modifiés) », ou `ancien → nouveau` pour un
+renommage. Un second appui réaffiche les en-têtes ; ce choix est lui aussi
+gardé pour les diffs suivants.
+
+`n` et `p` (minuscules ou majuscules) sautent d'une modification à
+l'autre, une modification étant une suite de lignes supprimées ou
+ajoutées : la suivante ou la précédente s'affiche trois lignes sous le haut
+de l'écran, sa première ligne en gras, et la ligne du bas indique
+« modification 3 sur 12 ». Après un défilement à la main, `n` repart du
+haut de l'écran.
+
 | Élément sous le curseur         | Contenu affiché                                     |
 |---------------------------------|-----------------------------------------------------|
 | Fichier de *Changes to be committed* | Ce qui sera commité (`git diff --cached`)      |
@@ -159,6 +173,8 @@ tel que git le produit.
 | ↑/↓ ou k/j             | Défiler d'une ligne       |
 | PgUp / PgDn ou Espace  | Défiler d'une page        |
 | v                      | Basculer entre côte à côte et unifié |
+| h                      | Masquer ou afficher les en-têtes git |
+| n / p                  | Aller à la modification suivante / précédente |
 | Début / Fin ou g / G   | Aller au début / à la fin |
 | Échap, ←, q ou d       | Revenir à la liste        |
 
