@@ -98,7 +98,7 @@ son passage dans l'index est annulé.
 3. Tapez le titre, par exemple `Ajoute le fichier de bienvenue`.
 4. **Entrée** passe au champ du message (facultatif). Tapez quelques lignes ;
    ici, Entrée crée une nouvelle ligne.
-5. **Ctrl+V** valide. (**Tab** passe d'un champ à l'autre, **Échap** annule.)
+5. **Ctrl+S** valide. (**Tab** passe d'un champ à l'autre, **Échap** annule.)
 
 Le message du bas affiche la sortie de git, par exemple
 `[main (commit racine) 1a2b3c4] Ajoute le fichier de bienvenue`.
@@ -188,7 +188,7 @@ Le titre `Ajoute le pain` est un peu court.
    `e modifier le message` apparaît dans l'aide.
 2. Appuyez sur **e** : la fenêtre s'ouvre avec le titre et le message actuels.
 3. Modifiez le titre, par exemple `Ajoute le pain à la liste de courses`,
-   puis **Ctrl+V**.
+   puis **Ctrl+S**.
 
 Le hash du commit change (c'est un nouveau commit), mais son contenu, son
 auteur et sa date restent les mêmes.
@@ -202,7 +202,7 @@ commit.
    la liste ; `s squash` apparaît alors dans l'aide.
 2. Appuyez sur **s**. La fenêtre propose le titre du plus ancien et, dans le
    message, ceux des autres.
-3. Ajustez le texte, puis **Ctrl+V**.
+3. Ajustez le texte, puis **Ctrl+S**.
 
 La liste ne compte plus que deux commits. Le contenu des fichiers n'a pas
 changé, et le commit fusionné garde l'auteur et la date du plus ancien.
@@ -270,12 +270,7 @@ positions précédentes de la branche ; les entrées de git4lazy s'appellent
 | Les commits sélectionnés doivent se suivre | Pour un squash, choisissez des commits voisins       |
 | Sélectionnez un seul commit           | `e` ne modifie qu'un commit à la fois                     |
 | Sélectionnez uniquement le dernier commit | `r` n'annule que le commit en haut de la liste        |
-| Le titre est obligatoire              | Remplissez le champ Titre avant Ctrl+V                    |
-
-**Ctrl+V colle au lieu de valider** : certains terminaux, comme Windows
-Terminal, utilisent Ctrl+V pour coller, et la touche n'arrive jamais à
-git4lazy. Retirez ce raccourci des paramètres du terminal, ou utilisez un
-terminal qui colle avec Ctrl+Maj+V.
+| Le titre est obligatoire              | Remplissez le champ Titre avant Ctrl+S                    |
 
 ## 9. Ranger le bac à sable
 

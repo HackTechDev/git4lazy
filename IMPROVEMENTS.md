@@ -80,8 +80,8 @@ La ligne d'aide du bas est tronquée sur un terminal étroit.
 
 ## 3. Confort et personnalisation
 
-- **Raccourcis configurables** (M) : Ctrl+V colle dans certains terminaux
-  (Windows Terminal) et n'arrive jamais à l'outil. Un fichier
+- **Raccourcis configurables** (M) : un raccourci comme Ctrl+S peut être
+  intercepté par le terminal et ne jamais arriver à l'outil. Un fichier
   `~/.config/git4lazy/config.toml` (`tomllib` est dans la bibliothèque
   standard depuis Python 3.11) permettrait de redéfinir les touches.
 - **Langue cohérente** (S) : les titres de section sont en anglais (repris de

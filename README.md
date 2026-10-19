@@ -77,7 +77,7 @@ renvoyée par git, s'affiche en bas de l'écran.
 |---------|-------------------------------------------------------|
 | Entrée  | Dans le titre : passer au message ; dans le message : nouvelle ligne |
 | Tab     | Changer de champ                                      |
-| Ctrl+V  | Valider (le titre est obligatoire)                    |
+| Ctrl+S  | Valider (le titre est obligatoire)                    |
 | Échap   | Annuler                                               |
 
 Le commit ne contient que les fichiers sélectionnés, dans leur version
@@ -104,7 +104,7 @@ sélection en cours permet l'action.
 
 Pour un squash, les commits sélectionnés doivent être au moins deux et se
 suivre. Une fenêtre s'ouvre avec le titre du plus ancien et les messages
-des autres, modifiables ; Ctrl+V valide, Échap annule. Comme avec
+des autres, modifiables ; Ctrl+S valide, Échap annule. Comme avec
 `git rebase -i`, le commit obtenu garde l'auteur et la date du plus ancien,
 et les commits plus récents sont recréés par-dessus. Le contenu des
 fichiers, l'index et la copie de travail ne changent pas. L'historique

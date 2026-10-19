@@ -24,6 +24,7 @@ import curses
 import os
 import subprocess
 import sys
+import termios
 from dataclasses import dataclass
 
 STAGED, UNSTAGED, UNTRACKED = 0, 1, 2
@@ -38,7 +39,7 @@ STATUS_LABELS = {
 }
 BACKSPACE = (curses.KEY_BACKSPACE, "\x7f", "\b")
 ENTER = (curses.KEY_ENTER, "\n", "\r")
-ESCAPE, CTRL_V = "\x1b", "\x16"
+ESCAPE, CTRL_S = "\x1b", "\x13"
 FILES, COMMITS = "files", "commits"
 # Touche, libellé de l'aide et sections où le curseur doit se trouver.
 FILE_ACTIONS = (("a", "a add", (UNSTAGED, UNTRACKED)), ("r", "r restore", (UNSTAGED,)),
@@ -353,7 +354,7 @@ class CommitDialog:
                 title, body = self.fields
                 if key == ESCAPE:
                     return None
-                if key == CTRL_V:
+                if key == CTRL_S:
                     if title.text:
                         return title.text, body.text
                     self.error, self.active = "Le titre est obligatoire.", 0
@@ -385,7 +386,7 @@ class CommitDialog:
             if active:
                 cursor = pos
         put(win, height - 3, 2, self.error, curses.color_pair(2) | curses.A_BOLD)
-        put(win, height - 2, 2, "Ctrl+V valider · Tab changer de champ · Échap annuler", curses.A_DIM)
+        put(win, height - 2, 2, "Ctrl+S valider · Tab changer de champ · Échap annuler", curses.A_DIM)
         try:
             win.move(*cursor)
         except curses.error:
@@ -782,6 +783,23 @@ class App:
             self.commit()
 
 
+def disable_flow_control():
+    """Laisse Ctrl+S arriver à l'outil au lieu de figer le terminal (XOFF).
+    curses.endwin() rétablit les réglages d'origine du terminal en quittant."""
+    try:
+        fd = sys.stdin.fileno()
+        attrs = termios.tcgetattr(fd)
+        attrs[0] &= ~termios.IXON
+        termios.tcsetattr(fd, termios.TCSANOW, attrs)
+    except (termios.error, OSError, ValueError):
+        pass
+
+
+def start(scr):
+    disable_flow_control()
+    App(scr).run()
+
+
 def main():
     toplevel = git("rev-parse", "--show-toplevel")
     if toplevel.returncode:
@@ -792,7 +810,7 @@ def main():
     # Un nom de fichier contenant « * » ou commençant par « : » reste un nom littéral.
     os.environ["GIT_LITERAL_PATHSPECS"] = "1"
     os.environ.setdefault("ESCDELAY", "25")
-    curses.wrapper(lambda scr: App(scr).run())
+    curses.wrapper(start)
     return 0
 
 

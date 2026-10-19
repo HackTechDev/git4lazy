@@ -50,7 +50,7 @@ The file has two layers, separated by `# --- Git ---` / `# --- Interface ---` ba
 - `App` has two views, `FILES` and `COMMITS`, switched with → and ←. Each has its own cursor and scroll offset (`self.top[view]`).
   - `run()` handles the global keys (`q`, F5), then delegates to `handle_files_key` or `handle_commits_key`.
   - `refresh()` re-reads status, branch and unpushed commits after every action.
-- `CommitDialog` (title and message fields, Ctrl+V validates, Esc cancels) and `DiffView` (full screen, scrollable, lines wrapped) are modal loops. `CommitDialog` takes a `draw_background` callback so it can draw over the current view. `CommitDialog` is reused, prefilled, for squash and reword.
+- `CommitDialog` (title and message fields, Ctrl+S validates, Esc cancels) and `DiffView` (full screen, scrollable, lines wrapped) are modal loops. `CommitDialog` takes a `draw_background` callback so it can draw over the current view. `CommitDialog` is reused, prefilled, for squash and reword.
 - Actions on files require an explicit selection; there is no fallback to the file under the cursor. They also require the cursor to be in the right section. `App.targets(*sections)` enforces both and posts the error message.
 - In the commits view, `commit_action_error(key)` is the single source of truth for whether `s`, `e` or `r` is allowed. It decides both the key's behaviour and the contextual help: `HELP[COMMITS]` has an `{actions}` placeholder filled from `COMMIT_ACTIONS`.
 - The diff key (`d`/`D`) is the exception to the selection rule: it acts on the item under the cursor.
