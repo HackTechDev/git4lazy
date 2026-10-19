@@ -518,6 +518,12 @@ class App:
         curses.doupdate()
         return self.scr.get_wch() in ("o", "O", "y", "Y")
 
+    def show_busy(self, text):
+        """Affiche un message d'attente avant une commande git qui peut durer."""
+        self.notify(text)
+        self.draw()
+        curses.doupdate()
+
     def in_section(self, *sections):
         """Vérifie que le curseur est dans une des sections attendues par l'action."""
         if self.current is None or self.current.section not in sections:
@@ -562,6 +568,7 @@ class App:
             if self.confirm(f"Commiter {len(targets)} fichier(s) ?"):
                 break
             # Non : retour à la fenêtre, titre et message conservés.
+        self.show_busy(f"Commit de {len(targets)} fichier(s) en cours…")
         result = git_commit(targets, *answer)
         self.refresh()
         self.report(result, result.stdout.splitlines()[0] if result.stdout else "Commit effectué.")
