@@ -803,7 +803,8 @@ def disable_flow_control():
         attrs = termios.tcgetattr(fd)
         attrs[0] &= ~termios.IXON
         termios.tcsetattr(fd, termios.TCSANOW, attrs)
-    except (termios.error, OSError, ValueError):
+        curses.def_prog_mode()  # mémorisé : réappliqué par curses après Ctrl+Z puis fg
+    except (termios.error, curses.error, OSError, ValueError):
         pass
 
 
