@@ -46,7 +46,41 @@ débordent ou le curseur de saisie se décale.
 question envoie `KEY_RESIZE`, compris comme « non ».
 **Piste** : ignorer `KEY_RESIZE` (redessiner et relire une touche).
 
-## 2. Fonctionnalités
+### Le curseur change de fichier après une action — S
+`self.cursor` est une position dans la liste, pas un fichier. Après un `a`
+ou un `u`, les fichiers changent de section et le curseur se retrouve sur
+un autre fichier, juste avant l'action suivante.
+**Piste** : mémoriser l'entrée sous le curseur avant `refresh()` et s'y
+recaler ensuite (à défaut, rester dans la même section). C'est aussi le
+point 2 du rafraîchissement automatique dans [TODO.md](TODO.md).
+
+## 2. Ne jamais perdre de travail
+
+### Filet de sécurité pour `r` (restaurer) — S
+C'est la seule action qui détruit des données : les modifications annulées
+ne sont récupérables nulle part.
+**Piste** : avant `git restore`, sauvegarder la copie de travail avec
+`git stash create` puis `git stash store -m "git4lazy: restore"`. Les
+fichiers ne changent pas, et la sauvegarde se retrouve avec
+`git stash list`. La confirmation peut rester en double sécurité.
+
+### Annuler la dernière réécriture — S
+Revenir sur un squash, un changement de message ou un reset demande
+aujourd'hui de taper `git reset --soft HEAD@{1}` ou `git reset HEAD@{1}`
+(décrit dans le tutoriel).
+**Piste** : dans la liste des commits, une touche qui annule la dernière
+opération de git4lazy, active seulement si la dernière entrée du reflog en
+vient (« git4lazy: squash », « git4lazy: reword »). Le reset (`r`) n'écrit
+pas encore d'entrée à son nom : lui en donner une.
+
+### Garder le message d'un commit refusé — S
+Si un hook git (`pre-commit`, `commit-msg`) refuse le commit, le titre et le
+message saisis sont perdus.
+**Piste** : les conserver en mémoire, ou dans `.git/` pour survivre à un
+redémarrage, et préremplir la fenêtre au prochain `c` à la place du titre
+du dernier commit.
+
+## 3. Fonctionnalités
 
 ### Indexer une partie d'un fichier — L
 L'équivalent de `git add -p`, pour ne commiter qu'une partie des
@@ -55,8 +89,9 @@ modifications d'un fichier.
 Espace et les appliquer avec `git apply --cached`.
 
 ### Fichiers non suivis : ignorer ou supprimer — S
-**Piste** : `i` ajoute les fichiers sélectionnés au `.gitignore` ; `d` les
-supprime, après confirmation.
+**Piste** : `i` ajoute les fichiers sélectionnés au `.gitignore` ; une autre
+touche (par exemple `x`, puisque `d` affiche le diff) les supprime, après
+confirmation.
 
 ### Annuler le dernier commit en gardant l'index — S
 `r` dans la liste des commits fait un `git reset HEAD~` : les modifications
@@ -78,7 +113,33 @@ La ligne d'aide du bas est tronquée sur un terminal étroit.
 **Piste** : afficher le nombre de caractères du titre, en orange au-delà de
 50 et en rouge au-delà de 72, comme le font la plupart des éditeurs.
 
-## 3. Confort et personnalisation
+### Voir la sortie complète de git — S
+La ligne du bas n'affiche que la dernière ligne d'une erreur, alors qu'un
+hook peut en écrire des dizaines.
+**Piste** : garder la sortie de la dernière commande et l'ouvrir avec une
+touche (par exemple `o`) dans la vue plein écran du diff (`DiffView`).
+
+### Compteurs et état dans l'en-tête — S
+**Piste** : le nombre de fichiers par section (« Untracked files (12) ») et,
+dans l'en-tête, le nombre de commits non poussés ou un rebase, un merge ou
+un cherry-pick en cours.
+
+### Dossiers non suivis repliés — M
+Avec `--untracked-files=all`, un dossier non ignoré comme `node_modules/`
+affiche des milliers de lignes.
+**Piste** : afficher les dossiers non suivis sur une ligne, les déplier
+avec Entrée, et permettre de sélectionner un dossier entier.
+
+### Recherche — M
+**Piste** : `/` filtre les fichiers d'une longue liste ; dans la vue diff,
+`/` cherche un texte et `n` passe au résultat (ou au bloc) suivant.
+
+### Copier le hash d'un commit — S
+**Piste** : dans la liste des commits, une touche qui copie le hash dans le
+presse-papiers avec la séquence OSC 52, reconnue par la plupart des
+terminaux modernes. Aucune dépendance.
+
+## 4. Confort et personnalisation
 
 - **Raccourcis configurables** (M) : un raccourci comme Ctrl+S peut être
   intercepté par le terminal et ne jamais arriver à l'outil. Un fichier
@@ -93,6 +154,10 @@ La ligne d'aide du bas est tronquée sur un terminal étroit.
   `s squash` ou `e modifier le message` d'après la seule sélection ; la
   présence d'un merge n'est vérifiée qu'à l'appui sur la touche, qui est
   alors refusée. Faire la vérification au moment de la sélection.
+- **Respecter `NO_COLOR`** (S) : si la variable d'environnement `NO_COLOR`
+  est définie, ne pas utiliser de couleurs (convention répandue). Penser
+  aussi au daltonisme : les sections indexées et non indexées ne se
+  distinguent que par le vert et le rouge.
 - **Chemins longs** (S) : un chemin plus large que l'écran est coupé.
   Couper au milieu (`src/…/fichier.py`) garderait visible le nom du fichier.
 - **Gros dépôts** (M) : chaque action relance `git status`, `git branch` et
@@ -100,7 +165,7 @@ La ligne d'aide du bas est tronquée sur un terminal étroit.
   ou avec un dossier non suivi très volumineux (`--untracked-files=all`),
   l'écran peut ralentir. Mesurer avant d'optimiser.
 
-## 4. Qualité du code et distribution
+## 5. Qualité du code et distribution
 
 ### Tests automatisés — M
 Les fonctionnalités ont été vérifiées à la main, avec des scripts jetables
@@ -143,5 +208,8 @@ code. Ajouter un fichier `LICENSE` (MIT, GPL…) selon vos intentions.
 
 Pour un maximum d'effet avec peu d'effort :
 
-1. Tests de la couche git (M) : ils sécurisent tout le reste
-2. Licence (S)
+1. Le curseur suit son fichier (S) : évite une action sur le mauvais fichier
+2. Filet de sécurité pour `r`, annuler la dernière réécriture, garder le
+   message d'un commit refusé (S chacun) : plus aucune perte de travail
+3. Tests de la couche git (M) : ils sécurisent tout le reste
+4. Licence (S)
