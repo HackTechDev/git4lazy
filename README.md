@@ -80,6 +80,9 @@ renvoyée par git, s'affiche en bas de l'écran.
 | Ctrl+S  | Valider (le titre est obligatoire) ; pour un commit, git4lazy demande confirmation (`o`), sinon on revient à la fenêtre |
 | Échap   | Annuler                                               |
 
+Le titre est prérempli avec celui du dernier commit (vide s'il n'y a encore
+aucun commit), et le message est vide.
+
 Le commit ne contient que les fichiers sélectionnés, dans leur version
 indexée. Les autres fichiers indexés restent dans l'index pour un prochain
 commit.

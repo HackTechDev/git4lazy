@@ -94,7 +94,8 @@ son passage dans l'index est annulé.
 ## 4. Premier commit
 
 1. Sélectionnez `bonjour.txt` dans *Changes to be committed*.
-2. Appuyez sur **c** : une fenêtre s'ouvre.
+2. Appuyez sur **c** : une fenêtre s'ouvre. Le titre est vide, puisque c'est
+   le premier commit du dépôt.
 3. Tapez le titre, par exemple `Ajoute le fichier de bienvenue`.
 4. **Entrée** passe au champ du message (facultatif). Tapez quelques lignes ;
    ici, Entrée crée une nouvelle ligne.
@@ -111,7 +112,8 @@ Le message du bas affiche la sortie de git, par exemple
 
 Avant de continuer, ajoutez et commitez aussi `courses.txt` : sélectionnez-le
 et appuyez sur **a**, puis sélectionnez-le dans *Changes to be committed* et
-appuyez sur **c**, avec le titre `Ajoute la liste de courses`.
+appuyez sur **c**. Cette fois, le titre est prérempli avec celui du dernier
+commit : effacez-le (Retour arrière) et tapez `Ajoute la liste de courses`.
 
 ## 5. Modifier un fichier suivi
 

@@ -9,7 +9,8 @@ Touches :
   a            git add (Changes not staged for commit, Untracked files)
   r            annuler les modifications (Changes not staged for commit)
   u            retirer de l'index (Changes to be committed)
-  c            commit (Changes to be committed), après confirmation
+  c            commit (Changes to be committed), après confirmation ;
+               le titre reprend celui du dernier commit
   →            liste des commits non poussés (← pour revenir aux fichiers)
                Espace pour sélectionner, s pour squasher les commits choisis,
                e pour modifier le message du commit choisi,
@@ -127,6 +128,11 @@ def read_unpushed():
 
 def message_of(sha):
     return git("log", "-1", "--format=%B", sha).stdout.strip()
+
+
+def last_title():
+    """Titre du dernier commit, ou chaîne vide s'il n'y a encore aucun commit."""
+    return git("log", "-1", "--format=%s").stdout.strip() if has_head() else ""
 
 
 def recommit(source, parent, message, author=None):
@@ -546,7 +552,8 @@ class App:
         targets = self.targets(*FILE_ACTION_SECTIONS["c"])
         if not targets:
             return
-        answer = ("", "")
+        # Titre du dernier commit proposé par défaut, message vide.
+        answer = (last_title(), "")
         while True:
             answer = CommitDialog(self.scr, self.draw, "Commit", *answer).run()
             if answer is None:
