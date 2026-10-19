@@ -139,6 +139,14 @@ les commits absents de toutes les branches distantes.
 suppressions en rouge, en-têtes de blocs en cyan. Les lignes trop longues
 sont repliées.
 
+Par défaut, le diff est **côte à côte** : l'ancienne version à gauche, la
+nouvelle à droite, avec les numéros de ligne de chaque côté ; une ligne
+modifiée apparaît en regard de sa nouvelle version. `v` bascule vers le
+diff **unifié** (celui de `git diff`) et inversement ; le mode choisi est
+gardé pour les diffs suivants. Sur un terminal de moins de 60 colonnes, le
+diff reste unifié. Le diff combiné d'un commit de merge s'affiche toujours
+tel que git le produit.
+
 | Élément sous le curseur         | Contenu affiché                                     |
 |---------------------------------|-----------------------------------------------------|
 | Fichier de *Changes to be committed* | Ce qui sera commité (`git diff --cached`)      |
@@ -150,6 +158,7 @@ sont repliées.
 |------------------------|---------------------------|
 | ↑/↓ ou k/j             | Défiler d'une ligne       |
 | PgUp / PgDn ou Espace  | Défiler d'une page        |
+| v                      | Basculer entre côte à côte et unifié |
 | Début / Fin ou g / G   | Aller au début / à la fin |
 | Échap, ←, q ou d       | Revenir à la liste        |
 

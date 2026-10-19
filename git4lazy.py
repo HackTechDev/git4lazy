@@ -5,7 +5,8 @@ Touches :
   ↑/↓ ou k/j   déplacer le curseur        Tab   changer de section
   Espace       (dé)sélectionner           F5    rafraîchir
   *            (dé)sélectionner toute la section du curseur
-  d            diff du fichier sous le curseur (ou du commit, dans la liste des commits)
+  d            diff du fichier sous le curseur (ou du commit, dans la liste des commits),
+               côte à côte ou unifié (v pour basculer)
   a            git add (Changes not staged for commit, Untracked files)
   r            annuler les modifications (Changes not staged for commit)
   u            retirer de l'index (Changes to be committed)
@@ -23,6 +24,7 @@ La ligne d'aide n'affiche que les actions possibles dans la section du curseur.
 
 import curses
 import os
+import re
 import subprocess
 import sys
 import termios
@@ -415,8 +417,20 @@ def diff_attr(line):
     return 0
 
 
+def wrap_full(line, width, attr):
+    """Ligne pleine largeur, repliée en morceaux de width colonnes."""
+    return [[(0, line[i:i + width], attr)] for i in range(0, len(line), width)] or [[(0, "", 0)]]
+
+
 class DiffView:
-    """Affichage plein écran d'un diff, défilant ; les lignes longues sont repliées."""
+    """Affichage plein écran d'un diff, défilant ; les lignes longues sont repliées.
+
+    Deux modes, basculés avec v : côte à côte (avant à gauche, après à droite)
+    ou unifié, comme git diff. Le mode choisi est gardé pour les diffs suivants.
+    """
+
+    side_by_side = True
+    MIN_SIDE_WIDTH = 60  # en dessous, les colonnes seraient illisibles : mode unifié
 
     def __init__(self, scr, title, text):
         self.scr = scr
@@ -425,10 +439,69 @@ class DiffView:
         self.top = 0
 
     def rows(self, width):
+        """Lignes à l'écran, chacune une liste de segments (colonne, texte, attribut)."""
+        if DiffView.side_by_side and width >= self.MIN_SIDE_WIDTH:
+            return self.side_rows(width)
         rows = []
         for line in self.lines:
-            attr = diff_attr(line)
-            rows += [(line[i:i + width], attr) for i in range(0, len(line), width)] or [("", 0)]
+            rows += wrap_full(line, width, diff_attr(line))
+        return rows
+
+    def side_rows(self, width):
+        column = (width - 3) // 2  # séparateur « │ » central sur 3 colonnes
+        text_width = column - 5    # numéro de ligne sur 4 colonnes + espace
+        rows, removed, added = [], [], []
+        old_no = new_no = 0
+        in_hunk = False
+
+        def cell(side):
+            """Morceaux repliés d'une ligne (numéro, texte, attribut) d'un côté."""
+            if side is None:
+                return [], 0
+            no, text, attr = side
+            chunks = [text[i:i + text_width] for i in range(0, len(text), text_width)] or [""]
+            return [(f"{no:>4} " if i == 0 else " " * 5) + c for i, c in enumerate(chunks)], attr
+
+        def pair(left, right):
+            (left_chunks, left_attr), (right_chunks, right_attr) = cell(left), cell(right)
+            for i in range(max(len(left_chunks), len(right_chunks))):
+                row = [(column, " │ ", curses.A_DIM)]
+                if i < len(left_chunks):
+                    row.append((0, left_chunks[i], left_attr))
+                if i < len(right_chunks):
+                    row.append((column + 3, right_chunks[i], right_attr))
+                rows.append(row)
+
+        def flush():
+            # Lignes supprimées et ajoutées d'un même bloc, mises en regard.
+            for i in range(max(len(removed), len(added))):
+                pair(removed[i] if i < len(removed) else None, added[i] if i < len(added) else None)
+            removed.clear()
+            added.clear()
+
+        for line in self.lines:
+            kind = line[:1]
+            if in_hunk and kind == "-":
+                removed.append((old_no, line[1:], curses.color_pair(2)))
+                old_no += 1
+            elif in_hunk and kind == "+":
+                added.append((new_no, line[1:], curses.color_pair(1)))
+                new_no += 1
+            elif in_hunk and kind == " ":
+                flush()
+                pair((old_no, line[1:], 0), (new_no, line[1:], 0))
+                old_no, new_no = old_no + 1, new_no + 1
+            else:
+                flush()
+                # « \ No newline at end of file » reste dans le bloc ; un diff
+                # combiné (@@@, commit de merge) s'affiche tel quel.
+                if not (in_hunk and kind == "\\"):
+                    header = re.match(r"@@ -(\d+)(?:,\d+)? \+(\d+)", line)
+                    in_hunk = bool(header)
+                    if header:
+                        old_no, new_no = int(header.group(1)), int(header.group(2))
+                rows += wrap_full(line, width, curses.A_DIM if kind == "\\" else diff_attr(line))
+        flush()
         return rows
 
     def run(self):
@@ -440,6 +513,11 @@ class DiffView:
             key = self.scr.get_wch()
             if key in (ESCAPE, "q", "Q", "d", "D", curses.KEY_LEFT):
                 return
+            elif key in ("v", "V"):
+                # Garde à peu près la même position dans le diff.
+                fraction = self.top / max(len(rows), 1)
+                DiffView.side_by_side = not DiffView.side_by_side
+                self.top = int(fraction * len(self.rows(max(w - 1, 1))))
             elif key in (curses.KEY_UP, "k"):
                 self.top -= 1
             elif key in (curses.KEY_DOWN, "j"):
@@ -458,10 +536,18 @@ class DiffView:
         scr.erase()
         h, w = scr.getmaxyx()
         put(scr, 0, 0, self.title.ljust(w), curses.A_REVERSE | curses.A_BOLD)
-        for y, (text, attr) in enumerate(rows[self.top:self.top + page], start=1):
-            put(scr, y, 0, text, attr)
+        for y, row in enumerate(rows[self.top:self.top + page], start=1):
+            for x, text, attr in row:
+                put(scr, y, x, text, attr)
+        # Le mode passe en tête : sur un terminal étroit, la fin de la ligne est coupée.
+        if not DiffView.side_by_side:
+            mode = "v côte à côte"
+        elif w - 1 < self.MIN_SIDE_WIDTH:
+            mode = "trop étroit : unifié"
+        else:
+            mode = "v unifié"
         last = min(self.top + page, len(rows))
-        put(scr, h - 1, 0, f"↑/↓ défiler  PgUp/PgDn page  Échap retour   "
+        put(scr, h - 1, 0, f"{mode}  ↑/↓ défiler  PgUp/PgDn page  Échap retour   "
                            f"lignes {self.top + 1}-{last} sur {len(rows)}", curses.A_DIM)
         scr.noutrefresh()
         curses.doupdate()
