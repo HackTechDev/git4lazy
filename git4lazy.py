@@ -543,13 +543,14 @@ class App:
 
     # Actions
 
-    def act(self, sections, action, done, question=None):
+    def act(self, sections, action, busy, done, question=None):
         targets = self.targets(*sections)
         if not targets:
             return
         if question and not self.confirm(question.format(n=len(targets))):
             self.notify("Annulé.")
             return
+        self.show_busy(busy.format(n=len(targets)))
         result = action(targets)
         self.refresh()
         self.report(result, f"{len(targets)} fichier(s) {done}.")
@@ -608,8 +609,9 @@ class App:
         messages = [message_of(sha) for sha in reversed(shas[newest:oldest + 1])]
         title, _, first_body = messages[0].partition("\n")
         body = "\n\n".join(m for m in [first_body.strip(), *messages[1:]] if m)
+        count = oldest - newest + 1
         self.rewrite(shas, newest, oldest, "squash", "Squash", title, body,
-                     f"{oldest - newest + 1} commits fusionnés en un seul.")
+                     f"Squash de {count} commits en cours…", f"{count} commits fusionnés en un seul.")
 
     def reword(self):
         if not self.check_commit_action("e"):
@@ -617,8 +619,8 @@ class App:
         shas = [c[0] for c in self.commits]
         index = self.chosen_commits()[0]
         title, _, body = message_of(shas[index]).partition("\n")
-        self.rewrite(shas, index, index, "reword", "Modifier le commit", title,
-                     body.strip(), "Message du commit modifié.")
+        self.rewrite(shas, index, index, "reword", "Modifier le commit", title, body.strip(),
+                     "Modification du message en cours…", "Message du commit modifié.")
 
     def undo_last_commit(self):
         if not self.check_commit_action("r"):
@@ -626,12 +628,13 @@ class App:
         if not self.confirm("Annuler le dernier commit ? Ses modifications resteront dans les fichiers."):
             self.notify("Annulé.")
             return
+        self.show_busy("Annulation du dernier commit en cours…")
         result = git_undo_last_commit()
         self.selected_commits.clear()
         self.refresh()
         self.report(result, "Dernier commit annulé : ses modifications ne sont plus indexées.")
 
-    def rewrite(self, shas, newest, oldest, label, heading, title, body, done):
+    def rewrite(self, shas, newest, oldest, label, heading, title, body, busy, done):
         # Les commits plus récents sont recréés aussi : aucun ne doit être un merge.
         if has_merges(shas[:oldest + 1]):
             self.notify("Impossible : l'historique concerné contient un merge.", error=True)
@@ -641,6 +644,7 @@ class App:
             self.notify("Annulé.")
             return
         message = answer[0] + (f"\n\n{answer[1]}" if answer[1] else "")
+        self.show_busy(busy)
         result = git_rewrite(shas, newest, oldest, message, label)
         self.selected_commits.clear()
         self.commit_cursor = newest
@@ -792,12 +796,14 @@ class App:
         elif key in ("d", "D"):
             self.show_file_diff()
         elif key == "a":
-            self.act(FILE_ACTION_SECTIONS["a"], git_add, "ajouté(s) à l'index")
+            self.act(FILE_ACTION_SECTIONS["a"], git_add, "Ajout de {n} fichier(s) à l'index…",
+                     "ajouté(s) à l'index")
         elif key == "r":
-            self.act(FILE_ACTION_SECTIONS["r"], git_restore, "restauré(s)",
-                     "Annuler les modifications de {n} fichier(s) ? Elles seront perdues.")
+            self.act(FILE_ACTION_SECTIONS["r"], git_restore, "Restauration de {n} fichier(s)…",
+                     "restauré(s)", "Annuler les modifications de {n} fichier(s) ? Elles seront perdues.")
         elif key == "u":
-            self.act(FILE_ACTION_SECTIONS["u"], git_unstage, "retiré(s) de l'index")
+            self.act(FILE_ACTION_SECTIONS["u"], git_unstage, "Retrait de {n} fichier(s) de l'index…",
+                     "retiré(s) de l'index")
         elif key == "c":
             self.commit()
 
