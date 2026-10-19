@@ -9,7 +9,7 @@ Touches :
   a            git add (Changes not staged for commit, Untracked files)
   r            annuler les modifications (Changes not staged for commit)
   u            retirer de l'index (Changes to be committed)
-  c            commit (Changes to be committed)
+  c            commit (Changes to be committed), après confirmation
   →            liste des commits non poussés (← pour revenir aux fichiers)
                Espace pour sélectionner, s pour squasher les commits choisis,
                e pour modifier le message du commit choisi,
@@ -546,10 +546,15 @@ class App:
         targets = self.targets(*FILE_ACTION_SECTIONS["c"])
         if not targets:
             return
-        answer = CommitDialog(self.scr, self.draw).run()
-        if answer is None:
-            self.notify("Commit annulé.")
-            return
+        answer = ("", "")
+        while True:
+            answer = CommitDialog(self.scr, self.draw, "Commit", *answer).run()
+            if answer is None:
+                self.notify("Commit annulé.")
+                return
+            if self.confirm(f"Commiter {len(targets)} fichier(s) ?"):
+                break
+            # Non : retour à la fenêtre, titre et message conservés.
         result = git_commit(targets, *answer)
         self.refresh()
         self.report(result, result.stdout.splitlines()[0] if result.stdout else "Commit effectué.")

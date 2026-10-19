@@ -59,7 +59,7 @@ ln -s "$PWD/git4lazy.py" ~/.local/bin/git4lazy
 | a          | Changes not staged for commit, Untracked files   | Ajouter les fichiers sélectionnés à l'index (`git add`) |
 | r          | Changes not staged for commit                    | Annuler les modifications des fichiers sélectionnés (`git restore`), après confirmation |
 | u          | Changes to be committed                          | Retirer les fichiers sélectionnés de l'index            |
-| c          | Changes to be committed                          | Saisir un titre et un message, puis commiter les fichiers sélectionnés |
+| c          | Changes to be committed                          | Saisir un titre et un message, puis commiter les fichiers sélectionnés, après confirmation |
 | →          | toutes                                           | Afficher les commits non poussés                        |
 | F5         | toutes                                           | Rafraîchir                                              |
 | q          | toutes                                           | Quitter                                                 |
@@ -77,7 +77,7 @@ renvoyée par git, s'affiche en bas de l'écran.
 |---------|-------------------------------------------------------|
 | Entrée  | Dans le titre : passer au message ; dans le message : nouvelle ligne |
 | Tab     | Changer de champ                                      |
-| Ctrl+S  | Valider (le titre est obligatoire)                    |
+| Ctrl+S  | Valider (le titre est obligatoire) ; pour un commit, git4lazy demande confirmation (`o`), sinon on revient à la fenêtre |
 | Échap   | Annuler                                               |
 
 Le commit ne contient que les fichiers sélectionnés, dans leur version

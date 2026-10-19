@@ -99,6 +99,8 @@ son passage dans l'index est annulé.
 4. **Entrée** passe au champ du message (facultatif). Tapez quelques lignes ;
    ici, Entrée crée une nouvelle ligne.
 5. **Ctrl+S** valide. (**Tab** passe d'un champ à l'autre, **Échap** annule.)
+6. git4lazy demande confirmation : appuyez sur **o** pour commiter. Toute
+   autre touche ramène à la fenêtre, avec le titre et le message conservés.
 
 Le message du bas affiche la sortie de git, par exemple
 `[main (commit racine) 1a2b3c4] Ajoute le fichier de bienvenue`.
