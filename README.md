@@ -66,6 +66,8 @@ ln -s "$PWD/git4lazy.py" ~/.local/bin/git4lazy
 
 `a`, `r`, `u` et `c` n'agissent que sur les fichiers sélectionnés : sans
 sélection dans la section, rien ne se passe et un message le signale.
+La ligne d'aide en bas de l'écran ne montre `a`, `r`, `u` et `c` que
+lorsque le curseur est dans une section où l'action s'applique.
 La liste est rafraîchie après chaque action ; le résultat, ou l'erreur
 renvoyée par git, s'affiche en bas de l'écran.
 

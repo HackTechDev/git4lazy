@@ -56,7 +56,9 @@ Untracked files :
 La ligne en surbrillance est le curseur. Déplacez-le avec ↑/↓ (ou `j`/`k`),
 et sautez d'une section à l'autre avec **Tab**. En bas de l'écran, l'avant-
 dernière ligne affiche le résultat de chaque action (ou l'erreur de git) et
-la dernière rappelle les touches.
+la dernière rappelle les touches. Elle s'adapte à la section du curseur :
+`a add` n'apparaît que dans *Changes not staged for commit* et *Untracked
+files*, `u unstage` et `c commit` que dans *Changes to be committed*.
 
 ## 2. Ajouter des fichiers à l'index
 

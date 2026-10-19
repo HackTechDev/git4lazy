@@ -17,6 +17,7 @@ Touches :
   q            quitter
 
 a, r, u et c n'agissent que sur les fichiers sélectionnés de la section.
+La ligne d'aide n'affiche que les actions possibles dans la section du curseur.
 """
 
 import curses
@@ -39,9 +40,14 @@ BACKSPACE = (curses.KEY_BACKSPACE, "\x7f", "\b")
 ENTER = (curses.KEY_ENTER, "\n", "\r")
 ESCAPE, CTRL_V = "\x1b", "\x16"
 FILES, COMMITS = "files", "commits"
+# Touche, libellé de l'aide et sections où le curseur doit se trouver.
+FILE_ACTIONS = (("a", "a add", (UNSTAGED, UNTRACKED)), ("r", "r restore", (UNSTAGED,)),
+                ("u", "u unstage", (STAGED,)), ("c", "c commit", (STAGED,)))
+FILE_ACTION_SECTIONS = {key: sections for key, _, sections in FILE_ACTIONS}
 COMMIT_ACTIONS = (("s", "s squash"), ("e", "e modifier le message"), ("r", "r reset"))
 HELP = {
-    FILES: "Espace sélect.  * tout  d diff  a add  r restore  u unstage  c commit  Tab section  → commits  F5 rafraîchir  q quitter",
+    # {actions} : seulement les actions possibles dans la section du curseur.
+    FILES: "Espace sélect.  * tout  d diff  {actions}Tab section  → commits  F5 rafraîchir  q quitter",
     # {actions} : seulement les actions que la sélection de commits permet.
     COMMITS: "Espace sélect.  {actions}d diff  ← fichiers  F5 rafraîchir  q quitter",
 }
@@ -536,7 +542,7 @@ class App:
         self.report(result, f"{len(targets)} fichier(s) {done}.")
 
     def commit(self):
-        targets = self.targets(STAGED)
+        targets = self.targets(*FILE_ACTION_SECTIONS["c"])
         if not targets:
             return
         answer = CommitDialog(self.scr, self.draw).run()
@@ -706,8 +712,13 @@ class App:
 
         put(scr, h - 2, 0, self.message,
             curses.color_pair(2) | curses.A_BOLD if self.message_is_error else curses.A_BOLD)
-        actions = "".join(f"{label}  " for key, label in COMMIT_ACTIONS
-                          if self.commit_action_error(key) is None)
+        if self.view == FILES:
+            section = self.current.section if self.current else None
+            actions = "".join(f"{label}  " for _, label, sections in FILE_ACTIONS
+                              if section in sections)
+        else:
+            actions = "".join(f"{label}  " for key, label in COMMIT_ACTIONS
+                              if self.commit_action_error(key) is None)
         put(scr, h - 1, 0, HELP[self.view].format(actions=actions), curses.A_DIM)
         scr.noutrefresh()
 
@@ -761,12 +772,12 @@ class App:
         elif key in ("d", "D"):
             self.show_file_diff()
         elif key == "a":
-            self.act((UNSTAGED, UNTRACKED), git_add, "ajouté(s) à l'index")
+            self.act(FILE_ACTION_SECTIONS["a"], git_add, "ajouté(s) à l'index")
         elif key == "r":
-            self.act((UNSTAGED,), git_restore, "restauré(s)",
+            self.act(FILE_ACTION_SECTIONS["r"], git_restore, "restauré(s)",
                      "Annuler les modifications de {n} fichier(s) ? Elles seront perdues.")
         elif key == "u":
-            self.act((STAGED,), git_unstage, "retiré(s) de l'index")
+            self.act(FILE_ACTION_SECTIONS["u"], git_unstage, "retiré(s) de l'index")
         elif key == "c":
             self.commit()
 
